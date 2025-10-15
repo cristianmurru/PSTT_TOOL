@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Errore {{ error_code }} - PSTT Tool</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="h-full">
+    <div class="min-h-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div class="text-center">
+                <div class="mx-auto h-24 w-24 flex items-center justify-center rounded-full bg-red-100">
+                    {% if error_code == 404 %}
+                        <i class="fas fa-search text-red-600 text-3xl"></i>
+                    {% else %}
+                        <i class="fas fa-exclamation-triangle text-red-600 text-3xl"></i>
+                    {% endif %}
+                </div>
+                
+                <h1 class="mt-6 text-3xl font-extrabold text-gray-900">
+                    Errore {{ error_code }}
+                </h1>
+                
+                <p class="mt-2 text-sm text-gray-600">
+                    {{ error_message }}
+                </p>
+                
+                <div class="mt-8">
+                    <a href="/" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition duration-200">
+                        <i class="fas fa-home mr-2"></i>Torna alla Homepage
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

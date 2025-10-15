@@ -1,0 +1,251 @@
+{
+  "default_environment": "collaudo",
+  "default_connection": "A00-CDG-Collaudo",
+  "environments": [
+    "collaudo",
+    "certificazione",
+    "produzione"
+  ],
+  "connections": [
+    {
+      "name": "A00-CDG-Collaudo",
+      "environment": "collaudo",
+      "db_type": "oracle",
+      "description": "Database Oracle Collaudo CDG",
+      "params": {
+        "host": "10.183.128.21",
+        "port": 1521,
+        "service_name": "pdbcirccol",
+        "username": "${DB_USER_A00-CDG-Collaudo}",
+        "password": "${DB_PASS_A00-CDG-Collaudo}"
+      }
+    },
+    {
+      "name": "A01-BOSC-Collaudo",
+      "environment": "collaudo",
+      "db_type": "oracle",
+      "description": "Database Oracle BOSC Collaudo",
+      "params": {
+        "host": "t-ttnv-scan.rete.testposte",
+        "port": 1521,
+        "service_name": "BOSCC19",
+        "username": "${DB_USER_A01-BOSC-Collaudo}",
+        "password": "${DB_PASS_A01-BOSC-Collaudo}"
+      }
+    },
+    {
+      "name": "A03-TT2_UFFICIO",
+      "environment": "collaudo",
+      "db_type": "postgresql",
+      "description": "Database PostgreSQL TT2 Ufficio",
+      "params": {
+        "host": "ttt20psql01azne.postgres.database.azure.com",
+        "port": 5432,
+        "service_name": "tt2_ufficio",
+        "username": "${DB_USER_A03-TT2_UFFICIO}",
+        "password": "${DB_PASS_A03-TT2_UFFICIO}"
+      }
+    },
+    {
+      "name": "B00-CDG-Certificazione",
+      "environment": "certificazione",
+      "db_type": "oracle",
+      "description": "Database Oracle Certificazione CDG",
+      "params": {
+        "host": "10.179.255.140",
+        "port": 1521,
+        "service_name": "circcert",
+        "username": "${DB_USER_B00-CDG-Certificazione}",
+        "password": "${DB_PASS_B00-CDG-Certificazione}"
+      }
+    },
+    {
+      "name": "C00-CDG-Produzione",
+      "environment": "produzione",
+      "db_type": "oracle",
+      "description": "Database Oracle Produzione CDG",
+      "params": {
+        "host": "10.179.111.76",
+        "port": 1555,
+        "service_name": "CIRCPROD",
+        "username": "${DB_USER_C00-CDG-Produzione}",
+        "password": "${DB_PASS_C00-CDG-Produzione}"
+      }
+    }
+  ],
+  "scheduling": [
+    {
+      "query": "CDG-NXV-005--Dispacci-Gabbie.sql",
+      "connection": "C00-CDG-Produzione",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "hour": 14,
+      "minute": 32,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date-1}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\exports",
+      "email_recipients": null
+    },
+    {
+      "query": "CDG-NXV-006--Mazzetti creati.sql",
+      "connection": "C00-CDG-Produzione",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "hour": 14,
+      "minute": 35,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date-1}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\exports",
+      "email_recipients": null
+    },
+    {
+      "query": "BOSC-NXV-001--Accessi operatori.sql",
+      "connection": "A01-BOSC-Collaudo",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "hour": 14,
+      "minute": 27,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\exports",
+      "email_recipients": null
+    },
+    {
+      "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
+      "connection": "A03-TT2_UFFICIO",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "hour": 14,
+      "minute": 28,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\exports",
+      "email_recipients": null
+    },
+    {
+      "query": "CDG-NXV--008--Esiti_V2.sql",
+      "connection": "C00-CDG-Produzione",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "hour": 14,
+      "minute": 30,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date-1}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
+      "email_recipients": null
+    },
+    {
+      "query": "CDG-INF-002--Visualizza Legenda DelReason.sql",
+      "connection": "A00-CDG-Collaudo",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "cron",
+      "days_of_week": null,
+      "hour": null,
+      "minute": null,
+      "cron_expression": "30 7 * * *",
+      "end_date": null,
+      "output_filename_template": "{query_name}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": true,
+      "sharing_mode": "filesystem",
+      "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
+      "email_recipients": null
+    },
+    {
+      "query": "CDG-INF-003--Visualizza Legenda Caunotif.sql",
+      "connection": "A00-CDG-Collaudo",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "cron",
+      "days_of_week": null,
+      "hour": null,
+      "minute": null,
+      "cron_expression": "40 8 * * *",
+      "end_date": "2025-10-15",
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "email",
+      "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
+      "email_recipients": "cristian.murru@posteitaliane.it"
+    }
+  ]
+}
