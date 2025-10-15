@@ -15,6 +15,8 @@ from app.models.queries import QueryExecutionRequest
 import json
 from app.models.scheduling import SchedulingItem, SchedulingHistoryItem
 from datetime import datetime, timedelta, date
+def _today():
+    return date.today()
 from app.core.config import get_settings
 import smtplib
 from email.message import EmailMessage
@@ -149,6 +151,42 @@ class SchedulerService:
             end_date = sched.get('end_date')
 
             logger.info(f"[SCHEDULER] Avvio export automatico per {query_filename} su {connection_name}")
+            # Controllo data di fine: accetta stringhe ISO (YYYY-MM-DD), stringhe DD/MM/YYYY,
+            # oggetti datetime/date. Se non è possibile parsare, logga il warning ma non blocca l'esecuzione.
+            def _parse_end_date(ed):
+                if ed is None:
+                    return None
+                # se è già un datetime o date
+                # controlla datetime prima di date perché datetime è sottoclasse di date
+                if isinstance(ed, datetime):
+                    return ed.date()
+                if isinstance(ed, date):
+                    return ed
+                if isinstance(ed, str):
+                    s = ed.strip()
+                    # prova ISO YYYY-MM-DD
+                    try:
+                        return date.fromisoformat(s)
+                    except Exception:
+                        pass
+                    # prova DD/MM/YYYY
+                    for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            return datetime.strptime(s, fmt).date()
+                        except Exception:
+                            continue
+                return None
+
+            if end_date:
+                parsed_end = _parse_end_date(end_date)
+                if parsed_end is None:
+                    logger.warning(f"Formato end_date non valido: {end_date}")
+                else:
+                    if _today() > parsed_end:
+                        logger.info(f"[SCHEDULER] Job {query_filename} non eseguito: oltre la data di fine {end_date}")
+                        return
+
+            # Esegui la query solo se non sopra la end_date
             start_time = datetime.now()
             request = {
                 "query_filename": query_filename,
@@ -171,14 +209,6 @@ class SchedulerService:
                 "error": getattr(result, "error_message", None) if result else None
             })
             self.save_history()
-
-            if end_date:
-                try:
-                    if date.today() > date.fromisoformat(end_date):
-                        logger.info(f"[SCHEDULER] Job {query_filename} non eseguito: oltre la data di fine {end_date}")
-                        return
-                except Exception:
-                    logger.warning(f"Formato end_date non valido: {end_date}")
 
             if not result or not getattr(result, 'success', True):
                 logger.error(f"[SCHEDULER] Errore export {query_filename}: {getattr(result, 'error_message', 'unknown')}")
