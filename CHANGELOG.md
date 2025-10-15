@@ -103,6 +103,17 @@ N/A - Versione iniziale
 
 ## [Unreleased]
 ### Added
+- Tests automatici per parsing e comportamento dello scheduler (skip/esecuzione basati su end_date).
+
+### Fixed
+- Scheduler: ora viene rispettata la `end_date`. Il servizio verifica la data di fine prima di eseguire la query e salta job scaduti.
+
+### Changed
+- Aggiunto `_today()` helper in `app/services/scheduler_service.py` per test deterministici.
+- Parsing `end_date` più robusto (supporto a YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, YYYY/MM/DD e oggetti datetime/date).
+- Spostata la verifica `end_date` prima dell'esecuzione della query per evitare esecuzioni non necessarie.
+
+### Added
 - Dashboard utente per gestione schedulazioni e monitoring (`/dashboard`)
 - API CRUD per schedulazioni (`GET/POST/PUT/DELETE /api/scheduler/scheduling`)
 - Test automatici CRUD schedulazioni (`test_scheduler_api_crud.py`)
