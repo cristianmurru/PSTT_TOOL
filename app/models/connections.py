@@ -3,7 +3,7 @@ Modelli per la gestione delle connessioni database
 """
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -35,8 +35,7 @@ class DatabaseConnection(BaseModel):
     last_connected: Optional[datetime] = Field(default=None, description="Ultimo collegamento riuscito")
     last_error: Optional[str] = Field(default=None, description="Ultimo errore riscontrato")
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
     
     def get_connection_string(self, env_vars: Dict[str, str]) -> str:
         """Genera la connection string per SQLAlchemy"""

@@ -7,6 +7,12 @@ cd /d "%~dp0"
 
 :: Activate virtual environment if present
 :: Windows PowerShell activation (for interactive session) is different; here we use the venv Scripts activate for cmd
+if exist "%~dp0start_pstt.ps1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start_pstt.ps1" %*
+    exit /b %ERRORLEVEL%
+)
+
+rem Fallback: simple cmd-based start (legacy)
 if exist ".venv\Scripts\activate.bat" (
     call ".venv\Scripts\activate.bat"
 ) else (
@@ -15,6 +21,12 @@ if exist ".venv\Scripts\activate.bat" (
     pause
     exit /b 1
 )
+
+if not exist "logs" mkdir "logs"
+set LOGFILE=logs\app.log
+start "PSTT Tool" cmd /c "python main.py >> %LOGFILE% 2>&1"
+echo PSTT Tool started (fallback). See %LOGFILE% for output.
+exit /b 0
 
 :: Optional: set environment variables from .env if desired (requires a helper or set manually)
 :: You can uncomment the following line to load a .env file using the 'set' builtin, but note it won't parse quotes and special chars safely.
