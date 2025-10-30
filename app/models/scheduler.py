@@ -3,7 +3,7 @@ Modelli per il sistema di scheduling
 """
 from datetime import datetime, time
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -46,8 +46,7 @@ class ScheduledQuery(BaseModel):
     last_run: Optional[datetime] = Field(default=None, description="Ultima esecuzione")
     next_run: Optional[datetime] = Field(default=None, description="Prossima esecuzione")
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class JobExecution(BaseModel):
@@ -72,8 +71,7 @@ class JobExecution(BaseModel):
     error_message: Optional[str] = Field(default=None, description="Messaggio di errore")
     stack_trace: Optional[str] = Field(default=None, description="Stack trace errore")
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ScheduleListResponse(BaseModel):

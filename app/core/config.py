@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from loguru import logger
 from app.models.scheduling import SchedulingItem
 
@@ -135,10 +136,7 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "allow"  # Permette campi extra dal file .env
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="allow")
 
 
 # Singleton per le configurazioni

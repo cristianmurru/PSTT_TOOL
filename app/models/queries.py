@@ -3,7 +3,7 @@ Modelli per la gestione delle query e dei parametri
 """
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -25,8 +25,7 @@ class QueryParameter(BaseModel):
     default_value: Optional[str] = Field(default=None, description="Valore di default")
     description: Optional[str] = Field(default=None, description="Descrizione del parametro")
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class QueryInfo(BaseModel):

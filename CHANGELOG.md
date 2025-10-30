@@ -104,6 +104,7 @@ N/A - Versione iniziale
 ## [Unreleased]
 ### Added
 
+
 ### Fixed
 - Sostituzione automatica dei parametri opzionali non valorizzati con stringa vuota
 ### Fixed
