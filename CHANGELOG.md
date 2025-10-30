@@ -103,24 +103,9 @@ N/A - Versione iniziale
 
 ## [Unreleased]
 ### Added
-- Dashboard utente per gestione schedulazioni e monitoring (`/dashboard`)
-- API CRUD per schedulazioni (`GET/POST/PUT/DELETE /api/scheduler/scheduling`)
-- Test automatici CRUD schedulazioni (`test_scheduler_api_crud.py`)
-- Dashboard hardware: Health Check mostra spazio disco, RAM e CPU
-- Dipendenza psutil per info hardware
-- Uniformato il layout dashboard.
-- Gestione script SQL multistep: esecuzione sequenziale di step con parametri e log dedicati
-- Gestione asincrona e concorrente dei job schedulati tramite APScheduler AsyncIOExecutor
 
 ### Fixed
-- Correzione endpoint PUT per modifica schedulazione
 - Sostituzione automatica dei parametri opzionali non valorizzati con stringa vuota
-- Fix errori ORA-00933 su Oracle per step DML
-- Sincronizzazione tra job schedulati/attivi e dashboard
-- Risolto problema di job saltati quando una schedulazione è in corso
-- Fix selezione query corretta nel form di modifica schedulazione
-
-## [1.0.1] - 2025-08-14
 ### Fixed
 - Export Excel ora funzionante: SheetJS caricata localmente, risolto errore CORB
 - Migliorato contrasto righe griglia risultati
