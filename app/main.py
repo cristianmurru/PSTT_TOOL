@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from loguru import logger
+import mimetypes
 
 from app.core.config import setup_logging, get_settings, get_connections_config
 from app.services.connection_service import ConnectionService
@@ -72,6 +73,13 @@ app = FastAPI(
 # Configurazione templates e static files
 settings = get_settings()
 templates = Jinja2Templates(directory=str(settings.base_dir / "app" / "templates"))
+# Ensure common font MIME types are registered (some OS/python installs
+# may not include .woff2/.woff mappings, which causes StaticFiles to return
+# text/plain and browsers to refuse fonts). Register them before mounting.
+mimetypes.add_type('font/woff2', '.woff2')
+mimetypes.add_type('font/woff', '.woff')
+mimetypes.add_type('font/ttf', '.ttf')
+
 app.mount("/static", StaticFiles(directory=str(settings.base_dir / "app" / "static")), name="static")
 
 # Registra i router API
