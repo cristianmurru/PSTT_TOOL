@@ -4,13 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestione Schedulazioni & Monitoring</title>
-    <!-- Tailwind CSS -->
+    <!-- Tailwind JS loader (local, same as home) -->
     <script src="/static/css/tailwind.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- flatpickr datepicker -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/it.js"></script>
+    <!-- FontAwesome (local css pointing to webfonts/) -->
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    <!-- flatpickr datepicker locale -->
+    <link rel="stylesheet" href="/static/css/flatpickr.min.css">
+    <script src="/static/js/flatpickr.js"></script>
+    <script src="/static/js/it.js"></script>
 </head>
 <body class="h-full">
 <div class="min-h-full">
@@ -22,7 +23,7 @@
                     <span class="font-bold text-xl text-gray-900">Scheduler Dashboard</span>
                 </div>
                 <div class="flex items-center">
-                    <a href="/" class="text-blue-600 hover:underline text-sm"><i class="fas fa-home mr-1"></i>Home</a>
+                    <a href="/" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf015;</span>Home</a>
                 </div>
             </div>
         </div>
@@ -343,7 +344,7 @@ function fetchScheduling() {
                     </div>
                     <div>
                         <button class="btn btn-sm btn-secondary mr-2" onclick="showEditForm(${i})"><i class="fas fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${i})"><i class="fas fa-trash"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${i})"><span class="fa-inline" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf1f8;</span></button>
                     </div>
                 </div>
             `).join('');
@@ -651,10 +652,22 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
 });
 
 function deleteSchedule(idx) {
+    // conferma prima di procedere
+    if (!confirm("Sei sicuro di voler eliminare questa schedulazione?")) {
+        return;
+    }
+
     fetch(`/api/scheduler/scheduling/${idx}`, {
         method: 'DELETE'
-    }).then(r => r.json()).then(() => {
+    }).then(r => {
+        if (!r.ok) throw new Error('delete-failed');
+        // some endpoints might return an empty body
+        return r.text().then(t => t ? JSON.parse(t) : {});
+    }).then(() => {
         fetchScheduling();
+    }).catch(err => {
+        console.error('Eliminazione fallita', err);
+        alert('Si è verificato un errore durante l\'eliminazione. Controlla i log.');
     });
 }
 
