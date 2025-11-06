@@ -652,16 +652,59 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
 });
 
 function deleteSchedule(idx) {
-    // conferma prima di procedere
-    if (!confirm("Sei sicuro di voler eliminare questa schedulazione?")) {
+    // apri la modal di conferma invece della confirm nativa
+    showDeleteModal(idx);
+}
+
+// Modal delete handling
+let _pendingDeleteIdx = null;
+
+function escapeHtml(unsafe) {
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function showDeleteModal(idx) {
+    _pendingDeleteIdx = idx;
+    const s = schedulingData[idx];
+    const msgEl = document.getElementById('delete-modal-message');
+    if (msgEl) {
+        const label = s ? `${escapeHtml(s.query)} su ${escapeHtml(s.connection)}` : `#${idx}`;
+        msgEl.innerHTML = `Sei sicuro di voler eliminare la schedulazione <strong>${label}</strong>?`;
+    }
+    const modal = document.getElementById('delete-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        // focus sul pulsante conferma
+        setTimeout(() => document.getElementById('delete-modal-confirm-btn')?.focus(), 50);
+    }
+}
+
+function hideDeleteModal() {
+    _pendingDeleteIdx = null;
+    const modal = document.getElementById('delete-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function confirmDelete() {
+    if (_pendingDeleteIdx === null) {
+        hideDeleteModal();
         return;
     }
-
+    const idx = _pendingDeleteIdx;
+    hideDeleteModal();
     fetch(`/api/scheduler/scheduling/${idx}`, {
         method: 'DELETE'
     }).then(r => {
         if (!r.ok) throw new Error('delete-failed');
-        // some endpoints might return an empty body
         return r.text().then(t => t ? JSON.parse(t) : {});
     }).then(() => {
         fetchScheduling();
@@ -670,6 +713,16 @@ function deleteSchedule(idx) {
         alert('Si è verificato un errore durante l\'eliminazione. Controlla i log.');
     });
 }
+
+// chiudi la modal con ESC (accessibilità/shortcut)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const modal = document.getElementById('delete-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            hideDeleteModal();
+        }
+    }
+});
 
 function fetchMonitoring() {
     fetch('/api/monitoring/scheduler/status')
@@ -739,5 +792,22 @@ try {
     console.warn('flatpickr init failed', e);
 }
 </script>
+
+<!-- Delete confirmation modal (Tailwind) -->
+<div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden" aria-hidden="true">
+    <div class="bg-white rounded-lg shadow-lg max-w-lg w-full mx-4">
+        <div class="p-4 border-b">
+            <h3 class="text-lg font-medium">Conferma eliminazione</h3>
+        </div>
+        <div class="p-4">
+            <p id="delete-modal-message" class="text-sm text-gray-700">Sei sicuro di voler eliminare questa schedulazione?</p>
+        </div>
+        <div class="p-4 flex justify-end gap-2 border-t">
+            <button type="button" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" onclick="hideDeleteModal()">Annulla</button>
+            <button id="delete-modal-confirm-btn" type="button" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="confirmDelete()">Elimina</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>
