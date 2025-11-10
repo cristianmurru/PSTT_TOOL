@@ -113,3 +113,22 @@ N/A - Versione iniziale
 - Header tabella risultati colorato blu
 - Visualizzazione query: solo gruppo+nome, ordinamento alfabetico, refresh su stato connesso
 - Eliminato file base.html non utilizzato
+
+### 2025-11-10 -  Unreleased / Integration
+
+### Changed
+- Tutti gli asset frontend critici ora serviti localmente da `app/static` (Tailwind loader, Font Awesome CSS + webfonts, flatpickr, SheetJS/xlsx). Rimosse dipendenze CDN per migliorare l'affidabilità in ambienti offline/chiusi.
+- `scheduler_dashboard.html`: allineata alla home; rimossi loader CDN, aggiunta modal grafica per conferma eliminazione schedulazioni (con supporto ESC per chiusura), fallback inline per icone Font Awesome che non venivano renderizzate.
+- `app/main.py`: migliorata la configurazione di logging (timestamp nel formato dei log), aggiunta robustezza encoding per esecuzione come servizio Windows (tentativi di reconfigure stdout/`safe_print`), e aggiunti parametri CLI `--host` e `--port` per avvio parametrizzato.
+- Aggiunti script operativi per Windows: `install_service.ps1` e `manage_service.ps1` (integrazione NSSM) per installare/gestire l'app come servizio di sistema.
+- `README.md`: aggiunta sezione dettagliata per la distribuzione come servizio Windows (NSSM), comandi di gestione e istruzioni per l'avvio manuale con porta parametrizzata.
+
+### Fixed
+- Risolti problemi di caricamento dei webfonts (Content-Type/MIME) registrando i tipi appropriati e aggiornando gli `@font-face` per puntare ai percorsi locali.
+- Risolti errori Unicode/Encoding quando l'app veniva eseguita come servizio su Windows (UnicodeEncodeError), garantendo che i messaggi di log non provochino crash del servizio.
+
+### Test
+- Eseguita la suite di test automatizzata: `pytest` -> 55 passed, 0 failed.
+
+### VCS
+- Raccolte le modifiche locali in branch `feature/unstaged-changes-20251110` e push verso remote (branch creato su origin).
