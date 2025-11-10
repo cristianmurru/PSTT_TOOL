@@ -56,6 +56,11 @@ Export/
 *.csv
 *.gz
 
+# NSSM (binaries/source). Keep local copies but don't track in git.
+nssm-*/
+nssm.exe
+nssm-2.24/
+
 # Temporary files
 *.tmp
 *.temp
