@@ -76,7 +76,7 @@
   "scheduling": [
     {
       "query": "CDG-NXV-006--Mazzetti creati.sql",
-      "connection": "C00-CDG-Produzione",
+      "connection": "A00-CDG-Collaudo",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -89,8 +89,8 @@
         5,
         6
       ],
-      "hour": 14,
-      "minute": 35,
+      "hour": 11,
+      "minute": 13,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date-1}.xlsx",
@@ -116,8 +116,8 @@
         5,
         6
       ],
-      "hour": 14,
-      "minute": 27,
+      "hour": 10,
+      "minute": 45,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -191,7 +191,7 @@
       "days_of_week": null,
       "hour": null,
       "minute": null,
-      "cron_expression": "59 7 * * *",
+      "cron_expression": "6 11 * * *",
       "end_date": null,
       "output_filename_template": "{query_name}.xlsx",
       "output_date_format": "%Y-%m-%d",
