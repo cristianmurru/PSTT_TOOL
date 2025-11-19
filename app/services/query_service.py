@@ -334,6 +334,13 @@ class QueryService:
                 )
             # STEP LOGIC
             steps = self._parse_sql_steps(processed_sql)
+            # Log parsed steps for diagnostics (first 200 chars each)
+            try:
+                for s in steps:
+                    preview = s["sql"][:200].replace('\n', ' ')
+                    logger.debug(f"[Diag] Step {s['number']} desc='{s['description']}' preview='{preview}'")
+            except Exception:
+                pass
             if len(steps) == 1 and steps[0]["description"] == "Query unica":
                 # Query semplice, esegui come prima
                 with engine.connect() as conn:
@@ -382,7 +389,17 @@ class QueryService:
                 last_result = None
                 with engine.connect() as conn:
                     for step in steps:
-                        sql_to_execute = step["sql"]
+                        original_step_sql = step["sql"]
+                        sql_to_execute = original_step_sql
+                        # Salva versione raw prima di qualsiasi sostituzione per diagnosi
+                        try:
+                            tmp_dir = Path(self.settings.query_dir) / "tmp"
+                            tmp_dir.mkdir(parents=True, exist_ok=True)
+                            raw_file = tmp_dir / f"tmp_step{step['number']}_raw.txt"
+                            with open(raw_file, "w", encoding="utf-8") as f_raw:
+                                f_raw.write(original_step_sql)
+                        except Exception as e:
+                            logger.error(f"Impossibile salvare raw step {step['number']}: {e}")
                         # Sostituisci parametri per ogni step
                         # Prima, crea una copia dei parametri e aggiungi quelli opzionali mancanti come stringa vuota
                         param_values = dict(request.parameters)
@@ -402,48 +419,159 @@ class QueryService:
                         try:
                             with open(tmp_file, "w", encoding="utf-8") as f:
                                 f.write(sql_to_execute)
+                            # Log transformation diff if changed
+                            if original_step_sql != sql_to_execute:
+                                try:
+                                    raw_preview = original_step_sql[:60].replace('\n', ' ')
+                                    final_preview = sql_to_execute[:60].replace('\n', ' ')
+                                    logger.debug(f"[Diag] Step {step['number']} transformed. Raw starts with: '{raw_preview}' Final starts with: '{final_preview}'")
+                                except Exception as log_e:
+                                    logger.debug(f"[Diag] Step {step['number']} transformed (preview unavail): {log_e}")
                         except Exception as e:
                             logger.error(f"Impossibile salvare la query in tmp_step{step['number']}.txt: {e}")
-                        is_select = sql_to_execute.strip().lower().startswith("select") or sql_to_execute.strip().lower().startswith("with")
+                        # Execute each statement inside the step separately.
+                        # Some DB drivers (and cx_Oracle) don't accept multi-statement strings,
+                        # so split on semicolons and run statements one by one.
+                        step_sql_normalized = sql_to_execute.strip()
+                        # Split statements by semicolon. Keep simple split — we'll strip empty pieces.
+                        statements = [s.strip() for s in re.split(r";\s*(?=\n|$)|;", step_sql_normalized) if s.strip()]
+                        for stmt in statements:
+                            # remove any trailing semicolon leftovers
+                            stmt = stmt.rstrip().rstrip(';').strip()
+                            if not stmt:
+                                continue
+                            is_select = stmt.lower().startswith("select") or stmt.lower().startswith("with")
+                            # Advanced diagnostics: measure execute and fetch times separately
+                            exec_time_ms = None
+                            fetch_time_ms = None
+                            fetch_error = None
+                            try:
+                                # Execute the statement as-is (no runtime hint stripping)
+                                stmt_to_execute = stmt
+                                t_exec_start = time.time()
+                                result = conn.execute(text(stmt_to_execute))
+                                exec_time_ms = (time.time() - t_exec_start) * 1000
+                                # For Oracle, commit after DML/DDL statements
+                                if db_type == "oracle" and not is_select:
+                                    try:
+                                        conn.commit()
+                                    except Exception:
+                                        pass
+                            except Exception as e:
+                                execution_time = (time.time() - start_time) * 1000
+                                err_msg = f"Statement execute failed: {stmt} - Error: {str(e)}"
+                                logger.error(err_msg)
+                                # Save per-step diagnostics file with statement-level failure
+                                try:
+                                    stmt_preview = stmt[:100].replace('\n', ' ')
+                                    diag_file = tmp_dir / f"tmp_step{step['number']}_diagnostics.txt"
+                                    with open(diag_file, 'a', encoding='utf-8') as df:
+                                        df.write(f"STATEMENT_EXECUTE_FAILED | {stmt_preview} | {str(e)}\n")
+                                except Exception:
+                                    pass
+                                return QueryExecutionResult(
+                                    query_filename=request.query_filename,
+                                    connection_name=request.connection_name,
+                                    success=False,
+                                    execution_time_ms=execution_time,
+                                    row_count=0,
+                                    error_message=err_msg,
+                                    parameters_used=request.parameters
+                                )
+                            if is_select:
+                                try:
+                                    t_fetch_start = time.time()
+                                    rows = result.fetchall()
+                                    fetch_time_ms = (time.time() - t_fetch_start) * 1000
+                                    column_names = list(result.keys()) if result.keys() else []
+                                    data = []
+                                    for row in rows:
+                                        row_dict = {}
+                                        for i, col_name in enumerate(column_names):
+                                            value = row[i] if i < len(row) else None
+                                            if isinstance(value, datetime):
+                                                row_dict[col_name] = value.isoformat()
+                                            else:
+                                                row_dict[col_name] = value
+                                        data.append(row_dict)
+                                    execution_time = (time.time() - start_time) * 1000
+                                    last_result = QueryExecutionResult(
+                                        query_filename=request.query_filename,
+                                        connection_name=request.connection_name,
+                                        success=True,
+                                        execution_time_ms=execution_time,
+                                        row_count=len(data),
+                                        column_names=column_names,
+                                        data=data,
+                                        parameters_used=request.parameters
+                                    )
+                                except Exception as e:
+                                    fetch_error = str(e)
+                                    execution_time = (time.time() - start_time) * 1000
+                                    stmt_preview = stmt[:100].replace('\n', ' ')
+                                    logger.error(f"Statement fetch failed: {stmt_preview} - Error: {fetch_error}")
+                                    # Append diagnostic info
+                                    try:
+                                        diag_file = tmp_dir / f"tmp_step{step['number']}_diagnostics.txt"
+                                        with open(diag_file, 'a', encoding='utf-8') as df:
+                                            df.write(f"STATEMENT_FETCH_FAILED | {stmt_preview} | {fetch_error}\n")
+                                    except Exception:
+                                        pass
+                                    return QueryExecutionResult(
+                                        query_filename=request.query_filename,
+                                        connection_name=request.connection_name,
+                                        success=False,
+                                        execution_time_ms=execution_time,
+                                        row_count=0,
+                                        error_message=f"Statement fetch failed: {fetch_error}",
+                                        parameters_used=request.parameters
+                                    )
+                            else:
+                                # Non-select statements: log exec time in diagnostics file
+                                try:
+                                    stmt_preview = stmt[:100].replace('\n', ' ')
+                                    diag_file = tmp_dir / f"tmp_step{step['number']}_diagnostics.txt"
+                                    with open(diag_file, 'a', encoding='utf-8') as df:
+                                        df.write(f"STATEMENT_EXECUTED | {stmt_preview} | exec_ms={exec_time_ms}\n")
+                                except Exception:
+                                    pass
+                        # --- Diagnostic checks after executing all statements in the step ---
                         try:
-                            result = conn.execute(text(sql_to_execute))
-                            if db_type == "oracle" and not is_select:
-                                conn.commit()
+                            # If this step references the temporary table, collect diagnostics
+                            step_upper = sql_to_execute.upper() if isinstance(sql_to_execute, str) else ''
+                            if 'APPO_BARCODE_NO_EMF' in step_upper:
+                                diagnostics = []
+                                try:
+                                    res_user = conn.execute(text("SELECT USER FROM DUAL"))
+                                    user = res_user.fetchone()[0] if res_user is not None else None
+                                    diagnostics.append(f"SESSION_USER={user}")
+                                except Exception as e:
+                                    diagnostics.append(f"SESSION_USER_ERROR={str(e)}")
+                                try:
+                                    res_schema = conn.execute(text("SELECT SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM DUAL"))
+                                    current_schema = res_schema.fetchone()[0] if res_schema is not None else None
+                                    diagnostics.append(f"CURRENT_SCHEMA={current_schema}")
+                                except Exception:
+                                    diagnostics.append("CURRENT_SCHEMA=UNAVAILABLE")
+                                # Try a COUNT on the target table to check persistence
+                                try:
+                                    cnt_res = conn.execute(text("SELECT COUNT(*) FROM starown.APPO_BARCODE_NO_EMF"))
+                                    cnt = cnt_res.fetchone()[0]
+                                    diagnostics.append(f"COUNT_starown.APPO_BARCODE_NO_EMF={cnt}")
+                                except Exception as e:
+                                    diagnostics.append(f"COUNT_ERROR={str(e)}")
+
+                                # Save diagnostics to tmp file
+                                try:
+                                    diag_file = tmp_dir / f"tmp_step{step['number']}_diagnostics.txt"
+                                    with open(diag_file, 'w', encoding='utf-8') as df:
+                                        for line in diagnostics:
+                                            df.write(line + '\n')
+                                    logger.debug(f"[Diag] Wrote diagnostics for step {step['number']}: {'; '.join(diagnostics)}")
+                                except Exception as e:
+                                    logger.error(f"Impossibile salvare diagnostica per step {step['number']}: {e}")
                         except Exception as e:
-                            execution_time = (time.time() - start_time) * 1000
-                            return QueryExecutionResult(
-                                query_filename=request.query_filename,
-                                connection_name=request.connection_name,
-                                success=False,
-                                execution_time_ms=execution_time,
-                                row_count=0,
-                                error_message=str(e),
-                                parameters_used=request.parameters
-                            )
-                        if is_select:
-                            rows = result.fetchall()
-                            column_names = list(result.keys()) if result.keys() else []
-                            data = []
-                            for row in rows:
-                                row_dict = {}
-                                for i, col_name in enumerate(column_names):
-                                    value = row[i] if i < len(row) else None
-                                    if isinstance(value, datetime):
-                                        row_dict[col_name] = value.isoformat()
-                                    else:
-                                        row_dict[col_name] = value
-                                data.append(row_dict)
-                            execution_time = (time.time() - start_time) * 1000
-                            last_result = QueryExecutionResult(
-                                query_filename=request.query_filename,
-                                connection_name=request.connection_name,
-                                success=True,
-                                execution_time_ms=execution_time,
-                                row_count=len(data),
-                                column_names=column_names,
-                                data=data,
-                                parameters_used=request.parameters
-                            )
+                            logger.error(f"Errore durante diagnostica step {step['number']}: {e}")
                 if last_result:
                     return last_result
                 else:
