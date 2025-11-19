@@ -167,6 +167,33 @@ FROM tt_application.operator o
 WHERE o.office_id LIKE '&OFFICE_PREFIX';
 ```
 
+### Nomenclatura dei file query
+
+Per garantire corretta mappatura delle query alle connessioni e al comportamento di scheduling, i file SQL in `Query/` devono seguire la seguente convenzione di naming:
+
+- Struttura generale: `<PREFIX>-<AREA>--<NNN>--<Descrizione>[--TEST].sql`
+   - `<PREFIX>`: codice progetto/ambiente funzionale (es. `CDG`, `BOSC`, `TT2_UFFICIO`). Deve comparire nel nome per mappare la query alla connessione corrispondente.
+   - `<AREA>`: opzionale, può indicare il sotto-sistema o il gruppo (es. `NXV`, `INF`, `AL`).
+   - `--<NNN>--`: numero sequenziale a tre cifre (es. `001`, `005`). Deve essere separato da doppio trattino `--` come nel repository.
+   - `<Descrizione>`: titolo breve descrittivo (spazi ammessi, preferibilmente senza caratteri speciali).
+   - `--TEST`: tag opzionale da usare per i file di test/integrazione (es. `CDG-TEST-001--...`).
+
+Esempi validi:
+
+- `CDG-TEST-001--Estrai ultimo stato - A2A.sql`
+- `BOSC-TEST-001--Accessi operatori.sql`
+- `TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql`
+
+Regole operative:
+
+- Il tool di esecuzione proverà a mappare la connessione cercando i token (parte del nome connessione) dentro il nome del file; assicurati che il `PREFIX` sia riconoscibile e corrisponda a una connessione configurata in `connections.json`.
+- Per i test automatici puoi utilizzare il suffisso `TEST` (consente di selezionare velocemente i file che devono essere eseguiti in regressione).
+- Mantieni il formato dei separatori (`--`) per permettere al parser di riconoscere il numero sequenziale e la descrizione.
+
+
+*** End Patch
+
+
 ## 🖥️ Interfaccia Web
 
 ### Funzionalità Principali
@@ -376,6 +403,86 @@ LOG_LEVEL=INFO
 HOST=0.0.0.0
 PORT=8000
 ```
+
+### Distribuire come servizio Windows (NSSM) - dettagli operativi
+
+Per garantire che l'applicazione sia eseguita in background, si riavvii automaticamente al boot e sia resiliente ai crash, consigliamo di installarla come servizio Windows usando NSSM (Non-Sucking Service Manager).
+
+Passaggi principali (riassunto):
+
+1. Scarica NSSM da https://nssm.cc/download e copia `nssm.exe` nella root del progetto o in una cartella nel `PATH`.
+2. Usa lo script `install_service.ps1` fornito nella root del progetto per installare/ricreare il servizio (richiede privilegi amministrativi):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install_service.ps1
+```
+
+Lo script configura automaticamente i log e il riavvio in caso di failure.
+
+### Comandi utili per la gestione del servizio
+
+I comandi seguenti sono disponibili tramite lo script `manage_service.ps1` incluso nel repository. Esegui sempre PowerShell come amministratore per le operazioni di installazione/disinstallazione e gestione del servizio.
+
+```powershell
+# Stato del servizio
+.\manage_service.ps1 -Action status
+
+# Avvia
+.\manage_service.ps1 -Action start
+
+# Ferma
+.\manage_service.ps1 -Action stop
+
+# Riavvia
+.\manage_service.ps1 -Action restart
+
+# Mostra gli ultimi log (stdout/stderr)
+.\manage_service.ps1 -Action logs
+
+# Disinstalla il servizio (rimuove la registrazione NSSM)
+.\manage_service.ps1 -Action uninstall
+```
+
+Se preferisci usare `nssm.exe` direttamente (se è nel `PATH` o nella cartella corrente):
+
+```powershell
+# Avvia
+.\nssm.exe start PSTT_Tool
+
+# Ferma
+.\nssm.exe stop PSTT_Tool
+
+# Stato
+.\nssm.exe status PSTT_Tool
+
+# Rimuovi
+.\nssm.exe remove PSTT_Tool confirm
+```
+
+### Avvio manuale con porta parametrizzata (sviluppo / debug)
+
+Per eseguire un'istanza manuale dell'app (utile per sviluppo o debug) su una porta diversa da quella del servizio, usa il parametro `--port` di `main.py`:
+
+```powershell
+# Esempio: lancia l'app su porta 8001
+.venv\Scripts\Activate.ps1
+python main.py --port 8001
+```
+
+In questo modo puoi avere contemporaneamente il servizio in background (es. su porta 8000) e una istanza manuale per sviluppo su altra porta.
+
+Se vuoi esporre l'app su tutte le interfacce (ad es. per accesso da rete), passa anche `--host 0.0.0.0`:
+
+```powershell
+python main.py --host 0.0.0.0 --port 8001
+```
+
+### Note operative
+
+- I file di configurazione e i dati (es. `connections.json`, `Query/`, `Export/`) sono condivisi tra il servizio e le istanze manuali: evita di modificare in parallelo per non creare race condition.
+- I log del servizio si trovano in `logs/service_stdout.log` e `logs/service_stderr.log` (configurati da `install_service.ps1`).
+- Per mantenere il repository leggero, valuta se tenere `nssm.exe` nella repo o copiarlo sul server in una cartella del `PATH`.
+
 
 ## ❓ Troubleshooting
 

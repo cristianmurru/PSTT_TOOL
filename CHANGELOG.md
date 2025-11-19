@@ -99,11 +99,7 @@ N/A - Versione iniziale
 
 ---
 
-## Template per future versioni
-
-## [Unreleased]
-### Added
-
+-## Template per future versions
 
 ### Fixed
 - Sostituzione automatica dei parametri opzionali non valorizzati con stringa vuota
@@ -132,3 +128,20 @@ N/A - Versione iniziale
 
 ### VCS
 - Raccolte le modifiche locali in branch `feature/unstaged-changes-20251110` e push verso remote (branch creato su origin).
+
+## [2025-11-19] - Multistep & Regression
+
+### Added
+- `tools/run_query_regression.py`: nuovo script per eseguire una batteria di test sulle query SQL (supporta filtro per nome e report JSON).
+
+### Changed
+- `tools/run_query_regression.py`: ora seleziona la `default_connection` da `connections.json` e mappa automaticamente la connection target dai token presenti nel nome file (es. `CDG`, `BOSC`, `TT2_UFFICIO`).
+- `app/services/query_service.py`: rimosso il comportamento temporaneo che a runtime eliminava i hint Oracle `PARALLEL`; ripristinata l'esecuzione delle statement così come sono nei file SQL.
+- `README.md`: aggiunta sezione **Nomenclatura dei file query** che descrive la convenzione di naming richiesta per le query e le regole di mapping alla connessione.
+
+### Fixed
+- Corrette e migliorate le diagnostiche per gli script SQL multistep: salvataggio di `tmp_stepN_raw.txt`, `tmp_stepN.txt` e `tmp_stepN_diagnostics.txt` per ogni step, con session user/schema e conteggio righe per verifica post-DML.
+
+### Notes
+- Le modifiche introdotte servono a stabilizzare l'esecuzione automatica delle query multistep e a permettere esecuzioni di regressione selettive basate sulla nomenclatura dei file.
+
