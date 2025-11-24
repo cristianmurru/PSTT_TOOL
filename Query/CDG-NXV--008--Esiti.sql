@@ -22,7 +22,7 @@ select /*+ parallel (mt,16) */
     END AS "TIPO RECAPITO",
     mt.causal||' - '||pc.causalname as PRODOTTO,
     bt.dscop as "UTENZA PTL",
-    mt.operator,
+    mt.operator OPERATORE,
     mt.caunotif||' - '||pca.descrizione as "TIPO ESITO", 
     count(*) as TOTALE
 from starown.mailpiece_tracks mt

@@ -1,0 +1,9 @@
+Data fine validità non funziona
+Stampare nei log in console data e ora operazione
+Visualizzare gli stessi log su scheduler dashboard - fix refresh dashboard
+L'esecuzione delle query deve essere permessa anche con ; finale
+Revisione Testlist  --done
+Irrobustimento log asincroni
+Link Chat AI Sourcesense
+Estrazione query datadog 
+Generazione e invio pdf
