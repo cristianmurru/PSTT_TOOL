@@ -1,0 +1,158 @@
+{
+  "generated_at": "2025-11-19T09:10:53.540498Z",
+  "results": [
+    {
+      "query": "BOSC-TEST-001--Accessi operatori.sql",
+      "success": true,
+      "row_count": 219,
+      "execution_time_ms": 5918.156862258911,
+      "error_message": null,
+      "columns": [
+        "id",
+        "operator_name",
+        "status",
+        "last_login",
+        "when_created",
+        "office_id",
+        "type",
+        "operator_first_name",
+        "operator_surname"
+      ],
+      "sample_rows": [
+        {
+          "id": "1259",
+          "operator_name": "RETE\\ACT3CSY",
+          "status": "E",
+          "last_login": "18-JUN-21 01.05.42.121000 PM",
+          "when_created": "18-JUN-21 01.04.55.209000 PM",
+          "office_id": "77207",
+          "type": "N",
+          "operator_first_name": null,
+          "operator_surname": null
+        },
+        {
+          "id": "1261",
+          "operator_name": "RETE\\ACT3E2S",
+          "status": "E",
+          "last_login": "18-JUN-21 03.32.56.614000 PM",
+          "when_created": "18-JUN-21 03.32.56.614000 PM",
+          "office_id": "77364",
+          "type": "N",
+          "operator_first_name": null,
+          "operator_surname": null
+        },
+        {
+          "id": "1262",
+          "operator_name": "RETE\\RTI3EK4",
+          "status": "E",
+          "last_login": "19-JAN-22 10.29.44.310000 AM",
+          "when_created": "18-JUN-21 05.23.45.613000 PM",
+          "office_id": "77207",
+          "type": "N",
+          "operator_first_name": null,
+          "operator_surname": null
+        }
+      ],
+      "timestamp": "2025-11-19T09:10:42.415626Z"
+    },
+    {
+      "query": "CDG-TEST-001--Estrai ultimo stato - A2A.sql",
+      "success": true,
+      "row_count": 1,
+      "execution_time_ms": 6221.553087234497,
+      "error_message": null,
+      "columns": [
+        "barcode",
+        "data_evento_recapito",
+        "frazionario",
+        "canale",
+        "msgtype",
+        "caunotif",
+        "esito",
+        "data_ultimo_evento",
+        "track_office",
+        "nome_frazionario"
+      ],
+      "sample_rows": [
+        {
+          "barcode": "F2MMRR0000011",
+          "data_evento_recapito": null,
+          "frazionario": null,
+          "canale": null,
+          "msgtype": "M1",
+          "caunotif": null,
+          "esito": "xxxxxxxxxxxx",
+          "data_ultimo_evento": "2017-04-26T10:50:00",
+          "track_office": "38400",
+          "nome_frazionario": "SESTO SAN GIOVANNI 1",
+          "frazionario_dest": null
+        }
+      ],
+      "timestamp": "2025-11-19T09:10:49.122818Z"
+    },
+    {
+      "query": "CDG-TEST-002--Visualizza Legenda DelReason.sql",
+      "success": true,
+      "row_count": 138,
+      "execution_time_ms": 592.494010925293,
+      "error_message": null,
+      "columns": [
+        "delreason",
+        "descrizione"
+      ],
+      "sample_rows": [
+        {
+          "delreason": "ASS",
+          "descrizione": "Destinatario Assente"
+        },
+        {
+          "delreason": "ATD",
+          "descrizione": "In attesa termini di distruzione"
+        },
+        {
+          "delreason": "AV1",
+          "descrizione": "Consegna per manifesta maggiore eta"
+        }
+      ],
+      "timestamp": "2025-11-19T09:10:49.874687Z"
+    },
+    {
+      "query": "TT2_UFFICIO-TEST-001--Estrai operatori PTL.sql",
+      "success": true,
+      "row_count": 44,
+      "execution_time_ms": 3492.71559715271,
+      "error_message": null,
+      "columns": [
+        "id",
+        "codice",
+        "data_creazione",
+        "data_ultimo_login",
+        "sistema"
+      ],
+      "sample_rows": [
+        {
+          "id": 100083,
+          "codice": "IAM00025",
+          "data_creazione": "2024-02-15",
+          "data_ultimo_login": "2025-11-06",
+          "sistema": "PTL"
+        },
+        {
+          "id": 100092,
+          "codice": "IAM13656",
+          "data_creazione": "2024-03-29",
+          "data_ultimo_login": "2024-03-29",
+          "sistema": "PTL"
+        },
+        {
+          "id": 100142,
+          "codice": "IAM00038",
+          "data_creazione": "2024-06-20",
+          "data_ultimo_login": "2025-06-06",
+          "sistema": "PTL"
+        }
+      ],
+      "timestamp": "2025-11-19T09:10:53.540498Z"
+    }
+  ]
+}
