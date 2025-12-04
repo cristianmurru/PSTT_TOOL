@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Schedulazioni & Monitoring</title>
+    <!-- Tailwind JS loader (local, same as home) -->
+    <script src="/static/css/tailwind.min.js"></script>
+    <!-- FontAwesome (local css pointing to webfonts/) -->
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    <!-- flatpickr datepicker locale -->
+    <link rel="stylesheet" href="/static/css/flatpickr.min.css">
+    <script src="/static/js/flatpickr.js"></script>
+    <script src="/static/js/it.js"></script>
+</head>
+<body class="h-full">
+<div class="min-h-full">
+    <nav class="bg-white shadow-lg border-b border-gray-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-calendar-alt text-blue-600 text-2xl mr-3"></i>
+                    <span class="font-bold text-xl text-gray-900">Scheduler Dashboard</span>
+                </div>
+                <div class="flex items-center">
+                    <a href="/" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf015;</span>Home</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <!-- Health Check -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-heartbeat mr-2"></i>Health Check</h2>
+                <div id="health-status">Caricamento...</div>
+            </div>
+            <!-- Monitoring Scheduler -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-tasks mr-2"></i>Monitoring Scheduler</h2>
+                <div id="monitoring-status">Caricamento...</div>
+            </div>
+        </div>
+        <!-- SPOSTA QUESTO BLOCCO QUI -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-gray-900"><i class="fas fa-list mr-2"></i>Schedulazioni Attive</h2>
+                <button class="btn btn-primary" onclick="showAddForm()"><i class="fas fa-plus mr-1"></i>Aggiungi</button>
+            </div>
+            <div id="scheduling-list">Caricamento...</div>
+            <div id="add-form" style="display:none;" class="mt-6">
+                <h5 class="font-semibold mb-2">Aggiungi nuova schedulazione</h5>
+                <form id="form-add-schedule">
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Connessione</label>
+                            <select class="form-input" name="connection" id="connectionSelect" required></select>
+                        </div>
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Query</label>
+                            <select class="form-input" name="query" id="querySelect" required></select>
+                        </div>
+                        <div class="flex-1 min-w-[180px] self-stretch">
+                            <label class="form-label">Data fine</label>
+                            <input type="text" class="form-input" name="end_date" id="endDateInput" placeholder="GG/MM/AAAA">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Modalità scheduling</label>
+                            <select class="form-input" name="scheduling_mode" id="schedulingModeSelect">
+                                <option value="classic">Classic</option>
+                                <option value="cron">Cron</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="cronExpressionBox">
+                            <label class="form-label">Cron expression</label>
+                            <input type="text" class="form-input" name="cron_expression" id="cronExpressionInput" placeholder="e.g. 0 7 * * *">
+                            <div id="cronError" class="text-sm text-red-600 mt-1" style="display:none;"></div>
+                            <div id="cronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener">Maggiori info</a></div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Ora</label>
+                            <input type="number" class="form-input" name="hour" min="0" max="23" placeholder="HH (0-23)" required>
+                            <div class="text-sm text-gray-400 mt-1">Inserisci l'ora in formato 24h (00-23)</div>
+                        </div>
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Minuto</label>
+                            <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
+                            <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
+                        </div>
+                        <div class="flex-1 min-w-[180px] self-start">
+                            <label class="form-label">Giorni della settimana</label>
+                            <select class="form-input" name="days_of_week" id="daysOfWeekSelect" multiple style="height:110px;">
+                                <option value="0">Lunedì</option>
+                                <option value="1">Martedì</option>
+                                <option value="2">Mercoledì</option>
+                                <option value="3">Giovedì</option>
+                                <option value="4">Venerdì</option>
+                                <option value="5">Sabato</option>
+                                <option value="6">Domenica</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[320px]">
+                            <label class="form-label">Output filename template</label>
+                            <input type="text" class="form-input" name="output_filename_template" id="outputFilenameTemplate" value="{query_name}_{date}.xlsx">
+                            <div id="filenameTemplateHelp" class="text-sm text-gray-500 mt-1">Token disponibili: <code>{query_name}</code>, <code>{date}</code>, <code>{date-1}</code>, <code>{timestamp}</code></div>
+                        </div>
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="form-label">Includi timestamp</label>
+                            <input type="checkbox" name="output_include_timestamp" id="outputIncludeTimestamp">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Condivisione</label>
+                            <select class="form-input" name="sharing_mode" id="sharingModeSelect">
+                                <option value="filesystem">Filesystem</option>
+                                <option value="email">Email</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="outputDirBox">
+                            <label class="form-label">Output directory</label>
+                            <input type="text" class="form-input" name="output_dir" id="outputDirInput" placeholder="C:\App\PSTT_TOOL\Exports">
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="emailRecipientsBox" style="display:none;">
+                            <label class="form-label">Email destinatari (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_recipients" id="emailRecipientsInput" placeholder="a@x.com|b@y.com">
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mb-2">
+                        <button type="button" class="btn btn-secondary" id="previewAddBtn">Anteprima nome file</button>
+                        <div id="previewAddResult" class="self-center text-sm text-gray-700"></div>
+                    </div>
+                    <button type="submit" class="btn btn-success mt-2">Salva</button>
+                    <button type="button" class="btn btn-secondary mt-2" onclick="hideAddForm()">Annulla</button>
+                </form>
+            </div>
+            <div id="edit-form" style="display:none;" class="mt-6">
+                <h5 class="font-semibold mb-2">
+                    Modifica schedulazione
+                    <em id="edit-schedule-name" class="text-gray-500 ml-2"></em>
+                </h5>
+                <form id="form-edit-schedule">
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Connessione</label>
+                            <select class="form-input" name="connection" id="editConnectionSelect" required></select>
+                        </div>
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Query</label>
+                            <select class="form-input" name="query" id="editQuerySelect" required></select>
+                        </div>
+                        <div class="flex-1 min-w-[180px] self-stretch">
+                            <label class="form-label">Data fine</label>
+                            <input type="text" class="form-input" name="end_date" id="editEndDateInput" placeholder="GG/MM/AAAA">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Modalità scheduling</label>
+                            <select class="form-input" name="scheduling_mode" id="editSchedulingModeSelect">
+                                <option value="classic">Classic</option>
+                                <option value="cron">Cron</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="editCronExpressionBox">
+                            <label class="form-label">Cron expression</label>
+                            <input type="text" class="form-input" name="cron_expression" id="editCronExpressionInput" placeholder="e.g. 0 7 * * *">
+                            <div id="editCronError" class="text-sm text-red-600 mt-1" style="display:none;"></div>
+                            <div id="editCronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener">Maggiori info</a></div>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Ora</label>
+                            <input type="number" class="form-input" name="hour" min="0" max="23" placeholder="HH (0-23)" required>
+                            <div class="text-sm text-gray-400 mt-1">Inserisci l'ora in formato 24h (00-23)</div>
+                        </div>
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Minuto</label>
+                            <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
+                            <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
+                        </div>
+                        <div class="flex-1 min-w-[180px] self-start">
+                            <label class="form-label">Giorni della settimana</label>
+                            <select class="form-input" name="days_of_week" id="editDaysOfWeekSelect" multiple style="height:110px;">
+                                <option value="0">Lunedì</option>
+                                <option value="1">Martedì</option>
+                                <option value="2">Mercoledì</option>
+                                <option value="3">Giovedì</option>
+                                <option value="4">Venerdì</option>
+                                <option value="5">Sabato</option>
+                                <option value="6">Domenica</option>
+                            </select>
+                        </div>
+                        <input type="hidden" name="idx">
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[320px]">
+                            <label class="form-label">Output filename template</label>
+                            <input type="text" class="form-input" name="output_filename_template" id="editOutputFilenameTemplate" value="{query_name}_{date}.xlsx">
+                            <div id="editFilenameTemplateHelp" class="text-sm text-gray-500 mt-1">Token disponibili: <code>{query_name}</code>, <code>{date}</code>, <code>{date-1}</code>, <code>{timestamp}</code></div>
+                        </div>
+                        <div class="flex-1 min-w-[160px]">
+                            <label class="form-label">Includi timestamp</label>
+                            <input type="checkbox" name="output_include_timestamp" id="editOutputIncludeTimestamp">
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 mb-2">
+                        <div class="flex-1 min-w-[220px]">
+                            <label class="form-label">Condivisione</label>
+                            <select class="form-input" name="sharing_mode" id="editSharingModeSelect">
+                                <option value="filesystem">Filesystem</option>
+                                <option value="email">Email</option>
+                            </select>
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="editOutputDirBox">
+                            <label class="form-label">Output directory</label>
+                            <input type="text" class="form-input" name="output_dir" id="editOutputDirInput" placeholder="C:\App\PSTT_TOOL\Exports">
+                        </div>
+                        <div class="flex-1 min-w-[320px]" id="editEmailRecipientsBox" style="display:none;">
+                            <label class="form-label">Email destinatari (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_recipients" id="editEmailRecipientsInput">
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mb-2">
+                        <button type="button" class="btn btn-secondary" id="previewEditBtn">Anteprima nome file</button>
+                        <div id="previewEditResult" class="self-center text-sm text-gray-700"></div>
+                    </div>
+                    <button type="submit" class="btn btn-success mt-2">Salva Modifiche</button>
+                    <button type="button" class="btn btn-secondary mt-2" onclick="hideEditForm()">Annulla</button>
+                </form>
+            </div>
+        </div>
+        <!-- ORA VIENE LO STORICO -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4"><i class="fas fa-history mr-2"></i>Storico Schedulazioni (ultimi 30 giorni)</h2>
+            <div id="history-list">Caricamento...</div>
+        </div>
+    </div>
+</div>
+<style>
+.btn-primary { background-color: #2563eb; color: #fff; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; transition: background-color 0.2s; display: flex; align-items: center; }
+.btn-primary:hover { background-color: #1d4ed8; }
+.btn-success { background-color: #10b981; color: #fff; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; transition: background-color 0.2s; display: flex; align-items: center; }
+.btn-success:hover { background-color: #059669; }
+.btn-secondary { background-color: #e5e7eb; color: #1f2937; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; transition: background-color 0.2s; display: flex; align-items: center; }
+.btn-secondary:hover { background-color: #d1d5db; }
+.form-input {
+    min-width: 220px;
+    max-width: 100%;
+    height: 32px;
+    font-size: 0.95rem;
+    padding: 0.25rem 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+select.form-input {
+    height: 32px;
+    min-width: 320px;
+    max-width: 100%;
+    font-size: 0.95rem;
+    padding: 0.25rem 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#edit-form .form-label, #add-form .form-label {
+    font-weight: 500;
+    margin-bottom: 2px;
+    display: block;
+}
+#edit-form .form-row, #add-form .form-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+#add-form .form-row, #edit-form .form-row {
+    margin-bottom: 1rem;
+}
+#add-form .form-row:last-child, #edit-form .form-row:last-child {
+    margin-bottom: 0;
+}
+#add-form, #edit-form {
+    max-width: 100%;
+    overflow-x: auto;
+}
+/* reduce width of scheduling mode select to avoid overlapping cron input */
+.form-input[name="scheduling_mode"], #editSchedulingModeSelect { max-width: 160px; }
+/* dim labels+fields when disabled to make state clearer */
+.field-disabled { opacity: 0.5; }
+.form-input:disabled { background-color: #f9fafb; cursor: not-allowed; }
+</style>
+<script>
+let schedulingData = [];
+let connections = [];
+let queries = [];
+
+function fetchConnections() {
+    fetch('/api/connections/list')
+        .then(r => r.json())
+        .then(data => {
+            connections = data.connections || [];
+            const select = document.getElementById('connectionSelect');
+            select.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+            const editSelect = document.getElementById('editConnectionSelect');
+            editSelect.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+        });
+}
+
+function fetchQueries() {
+    fetch('/api/queries')
+        .then(r => r.json())
+        .then(data => {
+            queries = data.queries || [];
+            const select = document.getElementById('querySelect');
+            select.innerHTML = queries.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
+            const editSelect = document.getElementById('editQuerySelect');
+            editSelect.innerHTML = queries.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
+        });
+}
+
+function fetchScheduling() {
+    fetch('/api/scheduler/scheduling')
+        .then(r => r.json())
+        .then(data => {
+            schedulingData = data.scheduling || [];
+            const list = document.getElementById('scheduling-list');
+            if (schedulingData.length === 0) {
+                list.innerHTML = '<div>Nessuna schedulazione attiva.</div>';
+                return;
+            }
+            list.innerHTML = schedulingData.map((s, i) => `
+                <div class="mb-2 flex items-center justify-between">
+                    <div>
+                        <b>${s.query}</b> <span class="text-sm text-gray-600">(${s.scheduling_mode}${s.cron_expression ? ' • ' + s.cron_expression : ''})</span><br>
+                        <span>alle ${s.scheduling_mode==='classic' ? `${String(s.hour).padStart(2,'0')}:${String(s.minute).padStart(2,'0')}` : 'cron' } su <span>${s.connection}</span></span><br>
+                        <span class="text-sm text-gray-500">Template: ${s.output_filename_template || '{query_name}_{date}.xlsx'}</span>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-secondary mr-2" onclick="showEditForm(${i})"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${i})"><span class="fa-inline" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf1f8;</span></button>
+                    </div>
+                </div>
+            `).join('');
+        });
+}
+
+function showAddForm() {
+    document.getElementById('add-form').style.display = 'block';
+    document.getElementById('edit-form').style.display = 'none';
+}
+
+function hideAddForm() {
+    document.getElementById('add-form').style.display = 'none';
+}
+
+function showEditForm(idx) {
+    fetchConnections();
+    fetchQueries();
+    setTimeout(() => {
+        const s = schedulingData[idx];
+        document.getElementById('editQuerySelect').value = s.query;
+        document.getElementById('editConnectionSelect').value = s.connection;
+        document.querySelector('#edit-form input[name="hour"]').value = s.hour;
+        document.querySelector('#edit-form input[name="minute"]').value = s.minute;
+        document.querySelector('#edit-form input[name="idx"]').value = idx;
+        // display end_date as DD/MM/YYYY if ISO provided
+        if (s.end_date) {
+            const parts = s.end_date.split('-');
+            if (parts.length === 3) document.querySelector('#edit-form input[name="end_date"]').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+            else document.querySelector('#edit-form input[name="end_date"]').value = s.end_date;
+        } else {
+            document.querySelector('#edit-form input[name="end_date"]').value = '';
+        }
+        // scheduling mode & cron
+        const schedMode = s.scheduling_mode || 'classic';
+        const editSchedEl = document.querySelector('#edit-form select[name="scheduling_mode"]');
+        if (editSchedEl) editSchedEl.value = schedMode;
+        const cronEl = document.querySelector('#edit-form input[name="cron_expression"]');
+        if (cronEl) cronEl.value = s.cron_expression || '';
+        // filename template and include timestamp
+        const outTpl = document.querySelector('#edit-form input[name="output_filename_template"]');
+        if (outTpl) outTpl.value = s.output_filename_template || '{query_name}_{date}.xlsx';
+        const outTs = document.querySelector('#edit-form input[name="output_include_timestamp"]');
+        if (outTs) outTs.checked = !!s.output_include_timestamp;
+        // sharing
+        const editSharing = document.querySelector('#edit-form select[name="sharing_mode"]');
+        if (editSharing) editSharing.value = s.sharing_mode || 'filesystem';
+        const editOutDir = document.querySelector('#edit-form input[name="output_dir"]');
+        if (editOutDir) editOutDir.value = s.output_dir || '';
+        const editEmails = document.querySelector('#edit-form input[name="email_recipients"]');
+        if (editEmails) editEmails.value = s.email_recipients || '';
+        const daysSelect = document.getElementById('editDaysOfWeekSelect');
+        Array.from(daysSelect.options).forEach(opt => {
+            opt.selected = s.days_of_week && s.days_of_week.includes(parseInt(opt.value));
+        });
+    // ensure fields reflect mode (enable/disable cron input instead of show/hide)
+    toggleFieldsForMode(document.getElementById('form-edit-schedule'), schedMode);
+    const editCronEl = document.querySelector('#edit-form input[name="cron_expression"]');
+    if (editCronEl) editCronEl.disabled = schedMode !== 'cron';
+        document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
+        document.getElementById('edit-form').style.display = 'block';
+        document.getElementById('add-form').style.display = 'none';
+    }, 100);
+}
+
+function hideEditForm() {
+    document.getElementById('edit-form').style.display = 'none';
+}
+
+// helper to enable/disable fields based on scheduling mode (available globally)
+function toggleFieldsForMode(form, mode) {
+    const isCron = mode === 'cron';
+    // cron expression visible/enabled
+    const cronEl = form.querySelector('[name="cron_expression"]');
+    if (cronEl) {
+        cronEl.disabled = !isCron;
+        const wrap = cronEl.closest('.flex-1');
+        if (wrap) wrap.classList.toggle('field-disabled', !isCron);
+    }
+    // classic fields
+    const daysEl = form.querySelector('[name="days_of_week"]');
+    const hourEl = form.querySelector('[name="hour"]');
+    const minuteEl = form.querySelector('[name="minute"]');
+    if (daysEl) { daysEl.disabled = isCron; const wrap = daysEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
+    if (hourEl) { hourEl.disabled = isCron; const wrap = hourEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
+    if (minuteEl) { minuteEl.disabled = isCron; const wrap = minuteEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
+}
+
+// convert dd/mm/yyyy to yyyy-mm-dd (ISO) or return undefined if empty/invalid
+function parseDDMMYYYYtoISO(s) {
+    if (!s) return undefined;
+    const parts = s.split('/');
+    if (parts.length !== 3) return undefined;
+    const [d, m, y] = parts.map(p => p.trim());
+    if (!d || !m || !y) return undefined;
+    const dd = d.padStart(2,'0');
+    const mm = m.padStart(2,'0');
+    return `${y}-${mm}-${dd}`;
+}
+
+// Show/hide cron and email fields
+function setupFormToggles() {
+    const schedulingMode = document.getElementById('schedulingModeSelect');
+    const cronBox = document.getElementById('cronExpressionBox');
+    // adjust scheduling select width to avoid overlapping cron textbox when cron selected
+    function adjustSchedulingSelectWidth(selectEl, mode) {
+        if (!selectEl) return;
+        if (mode === 'cron') {
+            selectEl.style.maxWidth = '140px';
+            selectEl.style.width = '140px';
+        } else {
+            selectEl.style.maxWidth = '';
+            selectEl.style.width = '';
+        }
+    }
+    if (schedulingMode) schedulingMode.addEventListener('change', (e) => {
+        // enable/disable cron input for add form
+        const addCronInput = cronBox ? cronBox.querySelector('[name="cron_expression"]') : null;
+        if (addCronInput) addCronInput.disabled = e.target.value !== 'cron';
+        toggleFieldsForMode(document.getElementById('form-add-schedule'), e.target.value);
+        adjustSchedulingSelectWidth(schedulingMode, e.target.value);
+    });
+    const editSchedulingMode = document.getElementById('editSchedulingModeSelect');
+    const editCronBox = document.getElementById('editCronExpressionBox');
+    if (editSchedulingMode) editSchedulingMode.addEventListener('change', (e) => {
+        // enable/disable cron input for edit form
+        const editCronInput = editCronBox ? editCronBox.querySelector('[name="cron_expression"]') : null;
+        if (editCronInput) editCronInput.disabled = e.target.value !== 'cron';
+        toggleFieldsForMode(document.getElementById('form-edit-schedule'), e.target.value);
+        adjustSchedulingSelectWidth(editSchedulingMode, e.target.value);
+    });
+
+    const sharingMode = document.getElementById('sharingModeSelect');
+    const outputDirBox = document.getElementById('outputDirBox');
+    const emailBox = document.getElementById('emailRecipientsBox');
+    sharingMode?.addEventListener('change', () => {
+        if (sharingMode.value === 'email') { emailBox.style.display = 'block'; outputDirBox.style.display = 'none'; }
+        else { emailBox.style.display = 'none'; outputDirBox.style.display = 'block'; }
+    });
+
+    const editSharingMode = document.getElementById('editSharingModeSelect');
+    const editOutputDirBox = document.getElementById('editOutputDirBox');
+    const editEmailBox = document.getElementById('editEmailRecipientsBox');
+    editSharingMode?.addEventListener('change', () => {
+        if (editSharingMode.value === 'email') { editEmailBox.style.display = 'block'; editOutputDirBox.style.display = 'none'; }
+        else { editEmailBox.style.display = 'none'; editOutputDirBox.style.display = 'block'; }
+    });
+
+    // wire initial toggle state
+    const addForm = document.getElementById('form-add-schedule');
+    const editForm = document.getElementById('form-edit-schedule');
+    if (addForm) {
+        const mode = addForm.scheduling_mode ? addForm.scheduling_mode.value : 'classic';
+        toggleFieldsForMode(addForm, mode);
+        const addCronInput = cronBox ? cronBox.querySelector('[name="cron_expression"]') : null;
+        if (addCronInput) addCronInput.disabled = mode !== 'cron';
+        adjustSchedulingSelectWidth(schedulingMode, mode);
+    }
+    if (editForm) {
+        const mode = editForm.scheduling_mode ? editForm.scheduling_mode.value : 'classic';
+        toggleFieldsForMode(editForm, mode);
+        const editCronInputInit = editCronBox ? editCronBox.querySelector('[name="cron_expression"]') : null;
+        if (editCronInputInit) editCronInputInit.disabled = mode !== 'cron';
+        adjustSchedulingSelectWidth(editSchedulingMode, mode);
+    }
+
+    // Preview buttons with validation
+    document.getElementById('previewAddBtn')?.addEventListener('click', () => {
+        const form = document.getElementById('form-add-schedule');
+        if (!form) return;
+        const mode = form.scheduling_mode ? form.scheduling_mode.value : 'classic';
+        toggleFieldsForMode(form, mode);
+        const cronInput = form.cron_expression ? form.cron_expression.value : '';
+        const cronErrorEl = document.getElementById('cronError');
+        if (mode === 'cron') {
+            const parts = cronInput ? cronInput.trim().split(/\s+/) : [];
+            if (!cronInput || parts.length < 5) {
+                cronErrorEl.textContent = 'Espressione cron non valida: deve contenere almeno 5 campi separati da spazi.';
+                cronErrorEl.style.display = 'block';
+                return;
+            }
+            if (parts.length === 6) {
+                cronErrorEl.textContent = 'Attenzione: sembra una cron a 6 campi (include i secondi). In questo sistema si usa il formato a 5 campi; una cron a 6 campi verrebbe interpretata come ogni N secondi.';
+                cronErrorEl.style.display = 'block';
+                return;
+            }
+            cronErrorEl.style.display = 'none';
+        }
+        const payload = {
+            query: form.query.value,
+            connection: form.connection.value,
+            scheduling_mode: mode,
+            cron_expression: form.cron_expression ? form.cron_expression.value || undefined : undefined,
+            output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
+            output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false
+        };
+        fetch('/api/scheduler/preview', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+            .then(r => r.json()).then(d => { document.getElementById('previewAddResult').textContent = d.filename; })
+            .catch(err => { document.getElementById('previewAddResult').textContent = 'Errore anteprima'; console.error(err); });
+    });
+
+    document.getElementById('previewEditBtn')?.addEventListener('click', () => {
+        const form = document.getElementById('form-edit-schedule');
+        if (!form) return;
+        const mode = form.scheduling_mode ? form.scheduling_mode.value : 'classic';
+        toggleFieldsForMode(form, mode);
+        const cronInput = form.cron_expression ? form.cron_expression.value : '';
+        const cronErrorEl = document.getElementById('editCronError');
+        if (mode === 'cron') {
+            const parts = cronInput ? cronInput.trim().split(/\s+/) : [];
+            if (!cronInput || parts.length < 5) {
+                cronErrorEl.textContent = 'Espressione cron non valida: deve contenere almeno 5 campi separati da spazi.';
+                cronErrorEl.style.display = 'block';
+                return;
+            }
+            if (parts.length === 6) {
+                cronErrorEl.textContent = 'Attenzione: sembra una cron a 6 campi (include i secondi). In questo sistema si usa il formato a 5 campi; una cron a 6 campi verrebbe interpretata come ogni N secondi.';
+                cronErrorEl.style.display = 'block';
+                return;
+            }
+            cronErrorEl.style.display = 'none';
+        }
+        const payload = {
+            query: form.query.value,
+            connection: form.connection.value,
+            scheduling_mode: mode,
+            cron_expression: form.cron_expression ? form.cron_expression.value || undefined : undefined,
+            output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
+            output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false
+        };
+        fetch('/api/scheduler/preview', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+            .then(r => r.json()).then(d => { document.getElementById('previewEditResult').textContent = d.filename; })
+            .catch(err => { document.getElementById('previewEditResult').textContent = 'Errore anteprima'; console.error(err); });
+    });
+}
+
+setupFormToggles();
+
+document.getElementById('form-add-schedule')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    // ensure fields reflect current mode
+    const mode = form.scheduling_mode ? form.scheduling_mode.value : 'classic';
+    toggleFieldsForMode(form, mode);
+    const days = Array.from(form.days_of_week.selectedOptions).map(opt => parseInt(opt.value));
+    const endDateIso = parseDDMMYYYYtoISO(form.end_date ? form.end_date.value : '');
+    const data = {
+        query: form.query.value,
+        hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
+        minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
+        connection: form.connection.value,
+        days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
+        end_date: endDateIso || undefined,
+        scheduling_mode: mode,
+        cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
+        output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
+        output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
+        sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
+        output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
+        email_recipients: form.email_recipients ? form.email_recipients.value || undefined : undefined
+    };
+    fetch('/api/scheduler/scheduling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        fetchScheduling();
+        fetchHistory();
+        hideAddForm();
+    });
+});
+
+document.getElementById('form-edit-schedule')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = e.target;
+    const idx = form.idx.value;
+    const mode = form.scheduling_mode ? form.scheduling_mode.value : 'classic';
+    toggleFieldsForMode(form, mode);
+    const days = Array.from(form.days_of_week.selectedOptions).map(opt => parseInt(opt.value));
+    const endDateIso = parseDDMMYYYYtoISO(form.end_date ? form.end_date.value : '');
+    const data = {
+        query: form.query.value,
+        hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
+        minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
+        connection: form.connection.value,
+        days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
+        end_date: endDateIso || undefined,
+        scheduling_mode: mode,
+        cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
+        output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
+        output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
+        sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
+        output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
+        email_recipients: form.email_recipients ? form.email_recipients.value || undefined : undefined
+    };
+    fetch(`/api/scheduler/scheduling/${idx}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).then(r => r.json()).then(() => {
+        fetchScheduling();
+        fetchHistory();
+        hideEditForm();
+    });
+});
+
+function deleteSchedule(idx) {
+    // apri la modal di conferma invece della confirm nativa
+    showDeleteModal(idx);
+}
+
+// Modal delete handling
+let _pendingDeleteIdx = null;
+
+function escapeHtml(unsafe) {
+    return String(unsafe)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function showDeleteModal(idx) {
+    _pendingDeleteIdx = idx;
+    const s = schedulingData[idx];
+    const msgEl = document.getElementById('delete-modal-message');
+    if (msgEl) {
+        const label = s ? `${escapeHtml(s.query)} su ${escapeHtml(s.connection)}` : `#${idx}`;
+        msgEl.innerHTML = `Sei sicuro di voler eliminare la schedulazione <strong>${label}</strong>?`;
+    }
+    const modal = document.getElementById('delete-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+        // focus sul pulsante conferma
+        setTimeout(() => document.getElementById('delete-modal-confirm-btn')?.focus(), 50);
+    }
+}
+
+function hideDeleteModal() {
+    _pendingDeleteIdx = null;
+    const modal = document.getElementById('delete-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+    }
+}
+
+function confirmDelete() {
+    if (_pendingDeleteIdx === null) {
+        hideDeleteModal();
+        return;
+    }
+    const idx = _pendingDeleteIdx;
+    hideDeleteModal();
+    fetch(`/api/scheduler/scheduling/${idx}`, {
+        method: 'DELETE'
+    }).then(r => {
+        if (!r.ok) throw new Error('delete-failed');
+        return r.text().then(t => t ? JSON.parse(t) : {});
+    }).then(() => {
+        fetchScheduling();
+    }).catch(err => {
+        console.error('Eliminazione fallita', err);
+        alert('Si è verificato un errore durante l\'eliminazione. Controlla i log.');
+    });
+}
+
+// chiudi la modal con ESC (accessibilità/shortcut)
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.key === 'Esc') {
+        const modal = document.getElementById('delete-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            hideDeleteModal();
+        }
+    }
+});
+
+function fetchMonitoring() {
+    fetch('/api/monitoring/scheduler/status')
+        .then(r => r.json())
+        .then(data => {
+            let html = `<div><b>Stato:</b> ${data.running ? '<span class="text-green-600">Attivo</span>' : '<span class="text-red-600">Non attivo</span>'}</div>`;
+            html += `<div><b>Job attivi:</b> ${data.active_jobs}</div>`;
+            html += `<div><b>Job schedulati:</b> ${data.scheduled_jobs}</div>`;
+            html += `<div><b>Ultima esecuzione:</b> ${data.last_execution && data.last_execution.timestamp ? data.last_execution.timestamp : 'N/A'}</div>`;
+            document.getElementById('monitoring-status').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('monitoring-status').innerHTML = '<span class="text-red-600">Errore nel caricamento dati monitoring.</span>';
+            console.error(error);
+        });
+}
+
+function fetchHealth() {
+    fetch('/api/monitoring/health')
+        .then(r => r.json())
+        .then(data => {
+            let html = `<div><b>App:</b> ${data.app_name}</div>`;
+            html += `<div><b>Status:</b> ${data.status}</div>`;
+            html += `<div><b>Spazio disco:</b> ${data.disk_free_gb} GB liberi su ${data.disk_total_gb} GB</div>`;
+            html += `<div><b>RAM:</b> ${data.ram_available_gb} GB liberi su ${data.ram_total_gb} GB</div>`;
+            html += `<div><b>CPU:</b> ${data.cpu_percent}%</div>`;
+            document.getElementById('health-status').innerHTML = html;
+        });
+}
+
+function fetchHistory() {
+    fetch('/api/scheduler/history')
+        .then(r => r.json())
+        .then(data => {
+            const list = document.getElementById('history-list');
+            if (!data.history || data.history.length === 0) {
+                list.innerHTML = '<div>Nessuna schedulazione eseguita negli ultimi 30 giorni.</div>';
+                return;
+            }
+            // Ordina per data decrescente
+            const sorted = data.history.slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            list.innerHTML = sorted.map(h => `
+                <div class="mb-2">
+                    <b>${h.query}</b> su <span>${h.connection}</span> alle <span>${h.timestamp}</span> - <span class="${h.status === 'success' ? 'text-green-600' : 'text-red-600'}">${h.status}</span> (${h.duration_sec ? h.duration_sec + 's' : 'N/A'})
+                    ${h.error ? `<span class='text-red-600'>Errore: ${h.error}</span>` : ''}
+                </div>
+            `).join('');
+        });
+}
+
+fetchConnections();
+fetchQueries();
+fetchScheduling();
+fetchMonitoring();
+fetchHealth();
+fetchHistory();
+setInterval(fetchMonitoring, 10000);
+setInterval(fetchHealth, 15000);
+// initialize flatpickr for localized DD/MM/YYYY inputs
+try {
+    if (window.flatpickr) {
+        flatpickr.localize(flatpickr.l10ns.it);
+        flatpickr('#endDateInput', { dateFormat: 'd/m/Y', allowInput: true });
+        flatpickr('#editEndDateInput', { dateFormat: 'd/m/Y', allowInput: true });
+    }
+} catch (e) {
+    console.warn('flatpickr init failed', e);
+}
+</script>
+
+<!-- Delete confirmation modal (Tailwind) -->
+<div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 hidden" aria-hidden="true">
+    <div class="bg-white rounded-lg shadow-lg max-w-lg w-full mx-4">
+        <div class="p-4 border-b">
+            <h3 class="text-lg font-medium">Conferma eliminazione</h3>
+        </div>
+        <div class="p-4">
+            <p id="delete-modal-message" class="text-sm text-gray-700">Sei sicuro di voler eliminare questa schedulazione?</p>
+        </div>
+        <div class="p-4 flex justify-end gap-2 border-t">
+            <button type="button" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300" onclick="hideDeleteModal()">Annulla</button>
+            <button id="delete-modal-confirm-btn" type="button" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="confirmDelete()">Elimina</button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -101,11 +101,12 @@ class SchedulerService:
                     )
                 except Exception as e:
                     logger.error(f"Errore nella creazione job per sched {sched}: {e}")
-            # Schedule cleanup job at 7:00 AM
+            # Cleanup job (direct coroutine, avoids create_task outside loop)
             self.scheduler.add_job(
-                lambda: asyncio.create_task(self.cleanup_old_exports()),
+                self.cleanup_old_exports,
                 CronTrigger(hour=7, minute=0),
-                name="Cleanup old exports"
+                name="Cleanup old exports",
+                misfire_grace_time=900,
             )
             logger.info("✅ SchedulerService avviato con job da configurazione")
         except Exception as e:
@@ -150,7 +151,8 @@ class SchedulerService:
             connection_name = sched.get('connection')
             end_date = sched.get('end_date')
 
-            logger.info(f"[SCHEDULER] Avvio export automatico per {query_filename} su {connection_name}")
+            export_id = f"{query_filename}-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+            logger.info(f"[SCHEDULER][{export_id}] START export per {query_filename} su {connection_name}")
             # Controllo data di fine: accetta stringhe ISO (YYYY-MM-DD), stringhe DD/MM/YYYY,
             # oggetti datetime/date. Se non è possibile parsare, logga il warning ma non blocca l'esecuzione.
             def _parse_end_date(ed):
@@ -195,7 +197,18 @@ class SchedulerService:
                 "parameters": {}
             }
             req_obj = QueryExecutionRequest(**request)
-            result = self.query_service.execute_query(req_obj)
+
+            # Timeout configurabile (default 300s) per la fase query
+            query_timeout = getattr(self.settings, 'scheduler_query_timeout_sec', 300)
+            logger.info(f"[SCHEDULER][{export_id}] START_QUERY timeout={query_timeout}s")
+            loop = asyncio.get_event_loop()
+            try:
+                result = await asyncio.wait_for(loop.run_in_executor(None, self.query_service.execute_query, req_obj), timeout=query_timeout)
+            except asyncio.TimeoutError:
+                logger.error(f"[SCHEDULER][{export_id}] TIMEOUT_QUERY superati {query_timeout}s")
+                result = None
+            duration_query = (datetime.now() - start_time).total_seconds()
+            logger.info(f"[SCHEDULER][{export_id}] END_QUERY duration={duration_query:.2f}s rows={getattr(result,'row_count',0)}")
             duration = (datetime.now() - start_time).total_seconds()
             status = "success" if result and getattr(result, 'success', True) else "fail"
             # registra esecuzione parziale
@@ -239,8 +252,40 @@ class SchedulerService:
 
             import pandas as pd
             df = pd.DataFrame(result.data)
-            df.to_excel(filepath, index=False)
-            logger.info(f"[SCHEDULER] Export completato: {filepath}")
+            # Strategia temp locale: crea file temporaneo e poi move atomico
+            tmp_dir = Path(output_dir) / "_tmp"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_file = tmp_dir / f"{filename}.tmp.xlsx"
+            write_start = datetime.now()
+            logger.info(f"[SCHEDULER][{export_id}] START_WRITE temp={tmp_file}")
+            write_timeout = getattr(self.settings, 'scheduler_write_timeout_sec', 120)
+            try:
+                # Usa keyword index=False per chiarezza
+                await asyncio.wait_for(loop.run_in_executor(None, lambda: df.to_excel(tmp_file, index=False)), timeout=write_timeout)
+            except asyncio.TimeoutError:
+                logger.error(f"[SCHEDULER][{export_id}] TIMEOUT_WRITE superati {write_timeout}s")
+                return
+            write_duration = (datetime.now() - write_start).total_seconds()
+            logger.info(f"[SCHEDULER][{export_id}] END_WRITE duration={write_duration:.2f}s size={tmp_file.stat().st_size}B")
+
+            # Move con retry
+            move_attempts = 3
+            for attempt in range(1, move_attempts + 1):
+                try:
+                    import shutil
+                    shutil.move(str(tmp_file), str(filepath))
+                    logger.info(f"[SCHEDULER][{export_id}] MOVE_OK {tmp_file} -> {filepath} attempt={attempt}")
+                    break
+                except Exception as move_err:
+                    logger.warning(f"[SCHEDULER][{export_id}] MOVE_FAIL attempt={attempt} error={move_err}")
+                    await asyncio.sleep(2 * attempt)
+            else:
+                logger.error(f"[SCHEDULER][{export_id}] MOVE_ABORT dopo {move_attempts} tentativi; file rimane in {tmp_file}")
+                return
+
+            total_duration = (datetime.now() - start_time).total_seconds()
+            logger.info(f"[SCHEDULER][{export_id}] EXPORT_COMPLETED total_duration={total_duration:.2f}s final={filepath}")
+            self._append_metrics(export_id, query_filename, connection_name, duration_query, write_duration, total_duration, getattr(result,'row_count',0))
 
             if sharing == 'email':
                 # prova a inviare via email, se non configurato logga e mantiene il file
@@ -261,6 +306,29 @@ class SchedulerService:
                 "error": str(e)
             })
             self.save_history()
+
+    def _append_metrics(self, export_id: str, query: str, connection: str, duration_query: float, duration_write: float, duration_total: float, rows: int):
+        try:
+            metrics_path = self.export_dir / "scheduler_metrics.json"
+            if metrics_path.exists():
+                with open(metrics_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            else:
+                data = []
+            data.append({
+                "export_id": export_id,
+                "query": query,
+                "connection": connection,
+                "timestamp": datetime.utcnow().isoformat(),
+                "duration_query_sec": duration_query,
+                "duration_write_sec": duration_write,
+                "duration_total_sec": duration_total,
+                "rows": rows
+            })
+            with open(metrics_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.warning(f"[SCHEDULER] Impossibile salvare metriche: {e}")
 
     def _send_email_with_attachment(self, recipients: Optional[str], filepath: Path):
         """Invia il file come attachment se le impostazioni SMTP sono configurate;

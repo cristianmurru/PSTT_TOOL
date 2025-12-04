@@ -163,7 +163,7 @@
       "email_recipients": null
     },
     {
-      "query": "CDG-NXV--008--Esiti_V2.sql",
+      "query": "CDG-NXV--008--Esiti.sql",
       "connection": "C00-CDG-Produzione",
       "enabled": true,
       "description": null,
@@ -199,6 +199,7 @@
       "hour": null,
       "minute": null,
       "cron_expression": "44 12 * * *",
+      "cron_expression": "47 9 * * *",
       "end_date": null,
       "output_filename_template": "{query_name}.xlsx",
       "output_date_format": "%Y-%m-%d",
@@ -206,6 +207,25 @@
       "output_include_timestamp": true,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
+      "email_recipients": null
+    },
+    {
+      "query": "test_query.sql",
+      "connection": "test_conn",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": null,
+      "hour": 10,
+      "minute": 30,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "filesystem",
+      "output_dir": null,
       "email_recipients": null
     }
   ]

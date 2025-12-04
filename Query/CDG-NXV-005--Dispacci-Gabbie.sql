@@ -1,4 +1,4 @@
-select /*+ PARALLEL (mt,32) */ mt.track_office as FRAZIONARIO,
+select /*+ PARALLEL (mt,16) */ mt.track_office as FRAZIONARIO,
        	decode(mt.msgtype,'C1','C1 - Controllo con immagine elettronica', 'C2', 'C2 - Controllo senza immagine elettronica') AS CONTROLLO_FORMAZIONE,
        	trunc(mt.trkdate) as DATA,
        	decode(substr(mt.dt_dispbarcode,0,2),'SV','GABBIA','DISPACCIO') as TIPO,

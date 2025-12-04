@@ -2,7 +2,7 @@ Select  /*+ parallel (mt,32) */  mt.track_office as FRAZIONARIO,
        trunc(mt.trkdate) as DATA,
        mt.bt_bundbarcode as MAZZETTO,
        mt.causal||' - '||pc.causalname as PRODOTTO,
-       count(*) as NUMERO_PEZZI , mt.operator
+       count(*) as NUMERO_PEZZI , mt.operator OPERATORE
   from starown.mailpiece_tracks mt
     left join starown.po_causals pc on (mt.causal = pc.causal)
 where mt.track_office in (select distinct officeid from starown.po_offices_anag where tipo_ufficio='NXV')
