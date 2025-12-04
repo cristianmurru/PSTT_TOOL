@@ -172,8 +172,10 @@ class PSITTool {
             this.currentQuery = query;
             this.renderQueryList(); // Aggiorna evidenza
             this.renderParametersForm(query);
-            // Rimuovi risultati precedenti
+            // Rimuovi risultati precedenti e reset stato export/preview
             this.lastResults = null;
+            this.fullResults = null;
+            this.lastResultsIsPreview = false;
             const resultsSection = document.getElementById('resultsSection');
             if (resultsSection) resultsSection.classList.add('hidden');
             // Aggiorna barra blu: reset righe e tempo
@@ -276,6 +278,7 @@ class PSITTool {
                     query_filename: this.currentQuery.filename,
                     connection_name: this.currentConnection,
                     parameters: parameters,
+                    // UI preview should be limited to 1000 rows to keep responsiveness
                     limit: 1000
                 })
             });
@@ -287,6 +290,17 @@ class PSITTool {
             }
             
             this.lastResults = result;
+            // mark as preview only if the returned row_count equals the preview limit
+            const previewLimit = 1000;
+            this.lastResultsIsPreview = (result.row_count === previewLimit);
+            // If the result contains less than the preview limit, treat it as full dataset and cache it
+            if (result.row_count < previewLimit) {
+                this.fullResults = result;
+                this.lastResultsIsPreview = false;
+            } else {
+                // clear any cached fullResults for previous queries
+                this.fullResults = null;
+            }
             this.renderResults(result);
             this.updateStatusBar();
             
@@ -369,8 +383,14 @@ class PSITTool {
         });
     }
     
-    filterTable(column, value) {
+    async filterTable(column, value) {
         this.filters[column] = value.toLowerCase();
+        // Ensure we have the full dataset before applying filters so filters work on entire result set
+        try {
+            await this.ensureFullDataset();
+        } catch (err) {
+            console.warn('Impossibile recuperare dataset completo per filtri:', err);
+        }
         this.applyFiltersAndSorting();
     }
     
@@ -388,8 +408,10 @@ class PSITTool {
     
     applyFiltersAndSorting() {
         if (!this.lastResults) return;
-        
-        let filteredData = [...this.lastResults.data];
+
+        // Usa il dataset completo se disponibile, altrimenti la preview
+        const source = this.fullResults ? this.fullResults : this.lastResults;
+        let filteredData = Array.isArray(source.data) ? [...source.data] : [];
         
         // Applica filtri
         Object.keys(this.filters).forEach(column => {
@@ -621,11 +643,40 @@ class PSITTool {
             statusRecords.classList.remove('hidden');
             statusTime.classList.remove('hidden');
             
+            // If we have fullResults cached, use its row_count as total
+            const total = (this.fullResults && this.fullResults.row_count) ? this.fullResults.row_count : this.lastResults.row_count;
             const count = filteredCount !== null ? filteredCount : this.lastResults.row_count;
-            const total = this.lastResults.row_count;
             
             recordCount.textContent = filteredCount !== null ? `${count}/${total}` : total.toString();
             executionTime.textContent = `${this.lastResults.execution_time_ms.toFixed(0)}ms`;
+            
+            // Show preview notice only when last result is flagged as preview and there is no fullResults cached
+            const previewElId = 'previewNotice';
+            let previewEl = document.getElementById(previewElId);
+            if (this.lastResultsIsPreview && !this.fullResults) {
+                if (!previewEl) {
+                    previewEl = document.createElement('div');
+                    previewEl.id = previewElId;
+                    previewEl.className = 'mt-2 px-3 py-2 text-sm text-yellow-800 bg-yellow-100 rounded';
+                }
+                previewEl.innerHTML = `Preview: visualizzate le prime ${this.lastResults.row_count} righe. I filtri in griglia verranno applicati all'intero dataset dopo il caricamento completo. Premi Export per scaricare il file completo.`;
+                if (!document.getElementById(previewElId)) {
+                    statusRecords.parentNode.insertBefore(previewEl, statusRecords.nextSibling);
+                }
+            } else {
+                if (previewEl) previewEl.remove();
+            }
+        }
+        else {
+            // No last results: clear/hide counters and preview notice
+            try {
+                statusRecords.classList.add('hidden');
+            } catch (e) {}
+            try { statusTime.classList.add('hidden'); } catch (e) {}
+            try { recordCount.textContent = ''; } catch (e) {}
+            try { executionTime.textContent = ''; } catch (e) {}
+            const previewEl = document.getElementById('previewNotice');
+            if (previewEl) previewEl.remove();
         }
     }
     
@@ -635,6 +686,38 @@ class PSITTool {
             overlay.classList.remove('hidden');
         } else {
             overlay.classList.add('hidden');
+        }
+    }
+
+    async ensureFullDataset() {
+        // If we already cached full results, return them
+        if (this.fullResults) return this.fullResults;
+        if (!this.currentQuery || !this.lastResults) throw new Error('Nessuna query eseguita');
+
+        this.showLoading(true);
+        try {
+            const paramsForExport = (this.lastResults && this.lastResults.parameters_used) ? this.lastResults.parameters_used : {};
+            const execResponse = await fetch('/api/queries/execute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    query_filename: this.currentQuery.filename,
+                    connection_name: this.currentConnection,
+                    parameters: paramsForExport
+                })
+            });
+            const execResult = await execResponse.json();
+            if (!execResponse.ok || !execResult.success) {
+                throw new Error(execResult.error_message || execResult.detail || 'Errore recupero dataset completo');
+            }
+            this.fullResults = execResult;
+            // once we have full results, clear preview flag
+            this.lastResultsIsPreview = false;
+            // re-render UI counts
+            this.updateStatusBar();
+            return execResult;
+        } finally {
+            this.showLoading(false);
         }
     }
     
@@ -674,61 +757,76 @@ class PSITTool {
         }
         try {
             this.showLoading(true);
-            const columns = this.lastResults.column_names;
-            const data = this.lastResults.data;
-            let filenameBase = (this.currentQuery.title || this.currentQuery.filename).replace(/[^a-zA-Z0-9-_]/g, '_');
-            console.log(`[EXPORT] Format: ${format}`);
-            console.log(`[EXPORT] Columns:`, columns);
-            console.log(`[EXPORT] Data:`, data);
-            if (format === 'csv') {
-                // CSV
-                let csv = columns.join(';') + '\n';
-                data.forEach(row => {
-                    csv += columns.map(col => {
-                        let val = row[col];
-                        if (val === null || val === undefined) return '';
-                        // Escape doppie virgolette
-                        val = String(val).replace(/"/g, '""');
-                        // Se contiene ; o " o newline, racchiudi tra "
-                        if (/;|"|\n/.test(val)) val = '"' + val + '"';
-                        return val;
-                    }).join(';') + '\n';
+            // Per l'export vogliamo il dataset completo: utilizziamo la cache se presente
+            // altrimenti richiediamo al backend i risultati senza limit (backend default None = nessun limite)
+            let execResult = this.fullResults;
+            if (!execResult) {
+                const paramsForExport = (this.lastResults && this.lastResults.parameters_used) ? this.lastResults.parameters_used : {};
+                const execResponse = await fetch('/api/queries/execute', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query_filename: this.currentQuery.filename,
+                        connection_name: this.currentConnection,
+                        parameters: paramsForExport
+                    })
                 });
-                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                execResult = await execResponse.json();
+                if (!execResponse.ok || !execResult.success) {
+                    throw new Error(execResult.error_message || execResult.detail || 'Errore nell\'esecuzione export');
+                }
+                // Cache risultati completi per eventuali successive operazioni (filter/sort/export)
+                this.fullResults = execResult;
+            }
+            // Prefer server-side export to ensure consistency with scheduled exports
+            const filenameBase = (this.currentQuery.title || this.currentQuery.filename).replace(/[^a-zA-Z0-9-_]/g, '_');
+            console.log(`[EXPORT] Requesting server export: format=${format} rows=${execResult ? execResult.row_count : 'unknown'}`);
+
+            try {
+                const exportBody = {
+                    query_filename: this.currentQuery.filename,
+                    connection_name: this.currentConnection,
+                    parameters: (this.lastResults && this.lastResults.parameters_used) ? this.lastResults.parameters_used : {},
+                    export_format: format
+                };
+
+                const resp = await fetch('/api/queries/export', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(exportBody)
+                });
+
+                if (!resp.ok) {
+                    // Try to parse JSON error
+                    let errBody = null;
+                    try { errBody = await resp.json(); } catch (e) { /* ignore */ }
+                    throw new Error((errBody && (errBody.error_message || errBody.detail)) || `Server export failed: ${resp.status}`);
+                }
+
+                const blob = await resp.blob();
+
+                // Try to get filename from response headers
+                let filename = filenameBase + (format === 'excel' ? '.xlsx' : '.csv');
+                const cd = resp.headers.get('content-disposition');
+                if (cd) {
+                    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^;"']+)"?/i);
+                    if (m && m[1]) {
+                        filename = decodeURIComponent(m[1]);
+                    }
+                }
+
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(blob);
-                link.download = filenameBase + '.csv';
+                link.download = filename;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-            } else if (format === 'excel') {
-                console.log('[EXPORT] Tentativo export Excel...');
-                if (typeof XLSX === 'undefined') {
-                    this.showError('Libreria SheetJS non caricata.');
-                    console.error('[EXPORT] XLSX non definito!');
-                    return;
-                }
-                try {
-                    const ws = XLSX.utils.json_to_sheet(data, { header: columns });
-                    const wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Risultati');
-                    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                    console.log('[EXPORT] Workbook generato:', wb);
-                    const blob = new Blob([wbout], { type: 'application/octet-stream' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = filenameBase + '.xlsx';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    console.log('[EXPORT] Download Excel avviato');
-                } catch (err) {
-                    console.error('[EXPORT] Errore generazione Excel:', err);
-                    this.showError('Errore generazione Excel: ' + err.message);
-                }
-            } else {
-                this.showError('Formato export non supportato');
-                console.warn('[EXPORT] Formato non supportato:', format);
+                console.log('[EXPORT] Server download avviato, filename=', filename);
+            } catch (err) {
+                console.error('[EXPORT] Errore export server:', err);
+                this.showError('Errore export server: ' + err.message);
             }
         } catch (error) {
             console.error('Errore nell\'export:', error);

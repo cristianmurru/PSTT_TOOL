@@ -131,6 +131,55 @@ L'applicazione dovrebbe:
 
 ---
 
+## 🧭 Esecuzione test (pytest)
+
+Qui trovi informazioni pratiche per eseguire la suite di test usando `pytest`, incluse note su `-q` e altri flag utili.
+
+- **`-q` / `--quiet`**: riduce la verbosità dell'output di `pytest`. Mostra un resoconto compatto (puntini e riepilogo compatto) invece dell'elenco dettagliato dei test eseguiti. Utile per run rapidi o CI per avere output più pulito.
+
+Perché si usa:
+- In CI o quando vuoi una console pulita con solo il risultato rapido (pass/fail), `-q` rende l'output più leggibile.
+- Quando esegui molte centinaia di test, evita output troppo verboso che rende difficile trovare i fallimenti.
+
+Cosa cambia rispetto ad altri flag:
+- `-v` / `--verbose` → mostra più informazioni (nomi test, dettagli).
+- `-q` → mostra meno informazioni (compatto).
+- `-x` / `--exitfirst` → ferma al primo fallimento.
+- `-k EXP` → esegue solo i test che corrispondono all'espressione `EXP`.
+
+Raccomandazione pratica:
+- Per una verifica rapida della suite: `python -m pytest -q`
+- Per debug di fallimenti (vedere quale test fallisce e i dettagli): `python -m pytest -v` oppure esegui senza `-q` per l'output completo.
+- Se vuoi solo i nomi dei test falliti e tracebacks completi: esegui `python -m pytest -q` per un run pulito, poi se ci sono fallimenti rilancia con `-vv` o senza `-q` per maggiori dettagli.
+
+Esempi (PowerShell):
+```powershell
+# Run breve (compatto)
+python -m pytest -q
+
+# Run verboso per debug
+python -m pytest -v
+
+# Ferma al primo fallimento (combinato con output compatto)
+python -m pytest -x -q
+
+# Esegui solo test matching l'espressione
+python -m pytest -k "scheduler and not slow"
+```
+
+Altri suggerimenti utili:
+- Se nel repository sono definiti `markers` (es. `integration`, `manual`), puoi includere o escludere test usando `-m`. Esempio per escludere test manuali/integration in CI:
+    ```powershell
+    python -m pytest -q -m "not integration and not manual"
+    ```
+- Se la suite è grande, esegui prima i test unitari (cartella `tests/unit` o con marker) e poi le integrazioni.
+- Per troubleshooting dei fallimenti: esegui il singolo test con il percorso completo del file e `-k` o usa `-q` per run pulito seguito da `-vv` per dettagli.
+
+Note CI / pratiche consigliate:
+- In pipeline CI, usa `-q` per log più compatti e assicurati di archiviare l'output completo dei test falliti (log) per debug.
+- Abilita la memorizzazione delle dipendenze (`pip cache`) e limita i test lunghi sotto marker `slow` o `integration` per le nightly run.
+
+
 ## 🔧 Troubleshooting Demo
 
 ### Problema: "Nessuna query trovata"

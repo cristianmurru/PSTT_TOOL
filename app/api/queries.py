@@ -3,7 +3,7 @@ API endpoints per la gestione e l'esecuzione delle query
 """
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends, Query, status, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi import Request
 from loguru import logger
 
@@ -14,6 +14,10 @@ from app.models.queries import (
     QueryExecutionRequest,
     QueryExecutionResult
 )
+from app.models.queries import ExportRequest
+import io
+import pandas as pd
+from datetime import datetime
 
 
 router = APIRouter()
@@ -102,6 +106,108 @@ async def execute_query(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno nell'esecuzione della query"
         )
+
+
+@router.post("/export", summary="Export query results (server-side)")
+async def export_query(
+    request: ExportRequest,
+    query_service: QueryService = Depends(get_query_service)
+):
+    """
+    Genera e restituisce il file di export (CSV o XLSX) usando pandas sul server.
+    """
+    try:
+        # Esegui la query senza limit per ottenere il dataset completo
+        exec_req = QueryExecutionRequest(
+            query_filename=request.query_filename,
+            connection_name=request.connection_name,
+            parameters=request.parameters,
+            limit=None
+        )
+        result = query_service.execute_query(exec_req)
+        if not result.success:
+            logger.error(f"Export fallito: {result.error_message}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=result.error_message or 'Errore esecuzione query')
+
+        # Costruisci DataFrame pandas dal risultato
+        try:
+            # result.data is expected to be a list of dicts with column keys
+            df = pd.DataFrame(result.data if result.data is not None else [])
+            # Ensure columns order matches column_names if provided
+            if getattr(result, 'column_names', None):
+                cols = result.column_names
+                # keep only existing columns in dataframe and in given order
+                cols_existing = [c for c in cols if c in df.columns]
+                df = df[cols_existing] if cols_existing else df
+        except Exception as e:
+            logger.exception(f"Errore costruzione DataFrame per export: {e}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Errore trasformazione risultati per export')
+
+        # Usa la stessa logica del SchedulerService: scrive su file in Export/_tmp poi sposta il file
+        from app.core.config import get_settings
+        from pathlib import Path
+        import time
+        settings = get_settings()
+        export_dir = Path(settings.export_dir)
+        tmp_dir = export_dir / '_tmp'
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        # filename base
+        base_name = request.query_filename.replace('.sql', '')
+        timestamp = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+
+        if request.export_format and request.export_format.lower() == 'csv':
+            # scrivi CSV su file temporaneo e poi sposta
+            temp_path = tmp_dir / f"{base_name}_{timestamp}.csv.tmp.csv"
+            final_path = export_dir / f"{base_name}_{timestamp}.csv"
+            csv_text = df.to_csv(index=False, sep=';', encoding='utf-8')
+            logger.info(f"[EXPORT] START_WRITE temp={temp_path}")
+            with open(temp_path, 'w', encoding='utf-8', newline='') as f:
+                f.write(csv_text)
+            size = temp_path.stat().st_size
+            logger.info(f"[EXPORT] END_WRITE duration=0 size={size}B")
+            size = temp_path.stat().st_size
+            logger.info(f"[EXPORT] START_WRITE temp={temp_path}")
+            logger.info(f"[EXPORT] END_WRITE duration=0 size={size}B")
+            try:
+                temp_path.replace(final_path)
+                logger.info(f"[EXPORT] MOVE_OK {temp_path} -> {final_path}")
+            except Exception:
+                logger.exception("[EXPORT] Errore nel muovere il file csv temporaneo")
+
+            # stream file
+            media_type = 'text/csv'
+            filename = final_path.name
+            headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+            return StreamingResponse(open(final_path, 'rb'), media_type=media_type, headers=headers)
+        else:
+            temp_path = tmp_dir / f"{base_name}_{timestamp}.xlsx.tmp.xlsx"
+            final_path = export_dir / f"{base_name}_{timestamp}.xlsx"
+            logger.info(f"[EXPORT] START_WRITE temp={temp_path}")
+            try:
+                # scrittura su file come fa lo scheduler
+                df.to_excel(temp_path, index=False)
+                duration = 0.0
+                size = temp_path.stat().st_size
+                logger.info(f"[EXPORT] END_WRITE duration={duration}s size={size}B")
+                try:
+                    temp_path.replace(final_path)
+                    logger.info(f"[EXPORT] MOVE_OK {temp_path} -> {final_path}")
+                except Exception:
+                    logger.exception("[EXPORT] Errore nel muovere il file temporaneo xlsx")
+            except Exception as e:
+                logger.exception(f"Errore generazione file xlsx: {e}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Errore generazione file xlsx')
+
+            media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            filename = final_path.name
+            headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+            return StreamingResponse(open(final_path, 'rb'), media_type=media_type, headers=headers)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Errore nell'export della query {request.query_filename}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Errore interno export')
 
 
 @router.post("/validate", summary="Valida parametri query")

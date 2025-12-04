@@ -71,6 +71,19 @@
         "username": "${DB_USER_C00-CDG-Produzione}",
         "password": "${DB_PASS_C00-CDG-Produzione}"
       }
+    },
+    {
+      "name": "C01-TT2_UFFICIO",
+      "environment": "produzione",
+      "db_type": "postgresql",
+      "description": "Database PostgreSQL TT2 Ufficio",
+      "params": {
+        "host": "ptt20psql07azwe.postgres.database.azure.com",
+        "port": 5432,
+        "service_name": "tt2_ufficio",
+        "username": "${DB_USER_C01-TT2_UFFICIO}",
+        "password": "${DB_PASS_C01-TT2_UFFICIO}"
+      }
     }
   ],
   "scheduling": [
@@ -130,21 +143,15 @@
     },
     {
       "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
-      "connection": "A03-TT2_UFFICIO",
+      "connection": "C01-TT2_UFFICIO",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
       "days_of_week": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
+        1
       ],
-      "hour": 5,
-      "minute": 55,
+      "hour": 9,
+      "minute": 33,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -191,7 +198,7 @@
       "days_of_week": null,
       "hour": null,
       "minute": null,
-      "cron_expression": "6 11 * * *",
+      "cron_expression": "44 12 * * *",
       "end_date": null,
       "output_filename_template": "{query_name}.xlsx",
       "output_date_format": "%Y-%m-%d",
