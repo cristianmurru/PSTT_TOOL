@@ -344,7 +344,8 @@ class QueryService:
             if len(steps) == 1 and steps[0]["description"] == "Query unica":
                 # Query semplice, esegui come prima
                 with engine.connect() as conn:
-                    if request.limit and request.limit > 0:
+                    # Applica LIMIT solo se è stato esplicitamente fornito un valore numerico
+                    if request.limit is not None and request.limit > 0:
                         processed_sql = self._add_limit_clause(processed_sql, request.limit, request.connection_name)
                     connection = self.connection_service.get_connection(request.connection_name)
                     db_type = connection.db_type.lower() if connection else None
@@ -637,7 +638,10 @@ class QueryService:
             return sql_content
     
     def _add_limit_clause(self, sql: str, limit: int, connection_name: str) -> str:
-        """Esegue la query così come è scritta nel file .sql, senza aggiungere LIMIT/ROWNUM per Oracle."""
+        """Aggiunge una clausola LIMIT/TOP ai DB che la supportano.
+        Se `limit` è None o <= 0 la query non viene modificata.
+        Per Oracle non viene aggiunta alcuna clausola.
+        """
         try:
             connection = self.connection_service.get_connection(connection_name)
             if not connection:
@@ -650,12 +654,19 @@ class QueryService:
             # Per gli altri db mantieni la logica precedente
             if any(keyword in sql_upper for keyword in ['LIMIT', 'ROWNUM', 'TOP', 'FETCH']):
                 return sql  # Query ha già limitazioni
+            # Se per qualche motivo limit non è un numero positivo, non modificare la query
+            try:
+                if limit is None or int(limit) <= 0:
+                    return sql
+            except Exception:
+                return sql
+
             if db_type in ["postgresql", "mysql"]:
-                return f"{sql} LIMIT {limit}"
+                return f"{sql} LIMIT {int(limit)}"
             elif db_type == "sqlserver":
-                return re.sub(r'\bSELECT\b', f'SELECT TOP {limit}', sql, count=1, flags=re.IGNORECASE)
+                return re.sub(r'\bSELECT\b', f'SELECT TOP {int(limit)}', sql, count=1, flags=re.IGNORECASE)
             else:
-                return f"{sql} LIMIT {limit}"
+                return f"{sql} LIMIT {int(limit)}"
         except Exception:
             return sql
     

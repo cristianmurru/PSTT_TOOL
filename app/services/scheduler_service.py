@@ -190,11 +190,11 @@ class SchedulerService:
 
             # Esegui la query solo se non sopra la end_date
             start_time = datetime.now()
+            # Do not force a hardcoded limit here; allow QueryExecutionRequest default (None = no limit)
             request = {
                 "query_filename": query_filename,
                 "connection_name": connection_name,
-                "parameters": {},
-                "limit": 10000
+                "parameters": {}
             }
             req_obj = QueryExecutionRequest(**request)
 

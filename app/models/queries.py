@@ -45,7 +45,7 @@ class QueryExecutionRequest(BaseModel):
     query_filename: str = Field(..., description="Nome del file query da eseguire")
     connection_name: str = Field(..., description="Nome della connessione da usare")
     parameters: Dict[str, Any] = Field(default={}, description="Valori dei parametri")
-    limit: Optional[int] = Field(default=1000, description="Limite righe risultato")
+    limit: Optional[int] = Field(default=None, description="Limite righe risultato (None = nessun limite)")
 
 
 class QueryExecutionResult(BaseModel):
