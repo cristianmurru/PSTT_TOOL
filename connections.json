@@ -129,8 +129,8 @@
         5,
         6
       ],
-      "hour": 10,
-      "minute": 45,
+      "hour": 8,
+      "minute": 57,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -150,8 +150,8 @@
       "days_of_week": [
         1
       ],
-      "hour": 9,
-      "minute": 33,
+      "hour": 8,
+      "minute": 52,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -177,8 +177,8 @@
         5,
         6
       ],
-      "hour": 14,
-      "minute": 30,
+      "hour": 11,
+      "minute": 41,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date-1}.xlsx",
@@ -198,8 +198,7 @@
       "days_of_week": null,
       "hour": null,
       "minute": null,
-      "cron_expression": "44 12 * * *",
-      "cron_expression": "47 9 * * *",
+      "cron_expression": "58 8 * * *",
       "end_date": null,
       "output_filename_template": "{query_name}.xlsx",
       "output_date_format": "%Y-%m-%d",

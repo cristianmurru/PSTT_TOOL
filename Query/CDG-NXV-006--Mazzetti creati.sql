@@ -1,5 +1,5 @@
-Select  /*+ parallel (mt,32) */  mt.track_office as FRAZIONARIO,
-       trunc(mt.trkdate) as DATA,
+Select  /*+ parallel (mt,16) */  mt.track_office as FRAZIONARIO,
+       to_char(mt.trkdate,'dd-mm-yy') DATA,
        mt.bt_bundbarcode as MAZZETTO,
        mt.causal||' - '||pc.causalname as PRODOTTO,
        count(*) as NUMERO_PEZZI , mt.operator OPERATORE
@@ -9,5 +9,5 @@ where mt.track_office in (select distinct officeid from starown.po_offices_anag 
    and msgtype in ('B7','B1')
    and mt.trkdate >= trunc(sysdate -1)
    and mt.trkdate < trunc(sysdate)
-group by mt.track_office, trunc(mt.trkdate), mt.bt_bundbarcode,mt.operator,mt.causal||' - '||pc.causalname
-order by mt.track_office, trunc(mt.trkdate)
+group by mt.track_office,  to_char(mt.trkdate,'dd-mm-yy'), mt.bt_bundbarcode,mt.operator,mt.causal||' - '||pc.causalname
+order by mt.track_office,  to_char(mt.trkdate,'dd-mm-yy');
