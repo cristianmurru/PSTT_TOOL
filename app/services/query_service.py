@@ -296,7 +296,14 @@ class QueryService:
     def _sanitize_sql_for_oracle(self, sql: str) -> str:
         """Rimuove caratteri speciali non validi alla fine della query per Oracle."""
         # Rimuove spazi, tab, newline e altri caratteri non stampabili alla fine
-        return sql.rstrip()
+        # Inoltre rimuove eventuali punti e virgola finali o slash (usati in script SQL*Plus)
+        if not isinstance(sql, str):
+            return sql
+        s = sql.rstrip()
+        # Rimuovi ripetutamente i terminatori espliciti di script (;) o slash (/)
+        while s.endswith(';') or s.endswith('/'):
+            s = s[:-1].rstrip()
+        return s
 
     def execute_query(self, request: QueryExecutionRequest) -> QueryExecutionResult:
         start_time = time.time()

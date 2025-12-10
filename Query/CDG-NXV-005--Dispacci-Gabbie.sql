@@ -1,6 +1,6 @@
 select /*+ PARALLEL (mt,16) */ mt.track_office as FRAZIONARIO,
        	decode(mt.msgtype,'C1','C1 - Controllo con immagine elettronica', 'C2', 'C2 - Controllo senza immagine elettronica') AS CONTROLLO_FORMAZIONE,
-       	trunc(mt.trkdate) as DATA,
+       	to_char(mt.trkdate,'dd-mm-yy') DATA,
        	decode(substr(mt.dt_dispbarcode,0,2),'SV','GABBIA','DISPACCIO') as TIPO,
        	mt.dt_dispbarcode as SIGILLO,
        	mt.causal||' - '||pc.causalname as PRODOTTO,
@@ -11,5 +11,5 @@ where mt.causal = pc.causal
   	and msgtype in ('C1','C2')
    	and mt.trkdate >= trunc(sysdate-1)  -- cambiato da arrivetimestamp a trkdate
    	and mt.trkdate < trunc(sysdate)
-group by mt.track_office, mt.msgtype, trunc(mt.trkdate), mt.dt_dispbarcode,mt.causal||' - '||pc.causalname,mt.operator
+group by mt.track_office, mt.msgtype, to_char(mt.trkdate,'dd-mm-yy'), mt.dt_dispbarcode,mt.causal||' - '||pc.causalname,mt.operator
 order by mt.track_office, mt.msgtype, mt.dt_dispbarcode

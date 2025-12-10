@@ -13,7 +13,7 @@ select /*+ parallel (mt,16) */
     poa.officename as "NOME_FRAZIONARIO",
     poa.provshort as PROVINCIA,
     poa.regname as REGIONE, 
-    trunc(mt.trkdate) as DATA ,
+    to_char(mt.trkdate,'dd-mm-yy') DATA,
     CASE mt.areadest
         WHEN 'AS' THEN 'MANUALE'
         WHEN 'TP' THEN 'PALMARE'
@@ -41,7 +41,7 @@ from starown.mailpiece_tracks mt
  poa.officename,
  poa.provshort,
  poa.regname, 
- trunc(mt.trkdate),
+ to_char(mt.trkdate,'dd-mm-yy'),
  CASE mt.areadest
         WHEN 'AS' THEN 'MANUALE'
         WHEN 'TP' THEN 'PALMARE'

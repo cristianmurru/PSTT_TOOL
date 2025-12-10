@@ -2,18 +2,6 @@
 
 Tutte le modifiche importanti a questo progetto saranno documentate in questo file.
 
-## [Unreleased] - 2025-12-04
-
-### Changed
-- **Export behavior:** Client-side Excel export removed; UI now requests exports from the server API so files are generated server-side (matches scheduler output and reduces client-side memory/size issues).
-
-### Removed
-- Removed local SheetJS bundle `app/static/js/xlsx.full.min.js` and related client-side export fallback. Clients must use server-side export endpoint (`POST /api/queries/export`).
-
-### Notes
-- Developers: update local environment if needed to run exports (DB connectivity and credentials required).
-
-
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
@@ -157,3 +145,13 @@ N/A - Versione iniziale
 ### Notes
 - Le modifiche introdotte servono a stabilizzare l'esecuzione automatica delle query multistep e a permettere esecuzioni di regressione selettive basate sulla nomenclatura dei file.
 
+## [2025-12-04] - Le esportazioni Excel/CSV vengono ora generate dall'API (POST /api/queries/export) per allineare i file prodotti dall'interfaccia con quelli generati dallo scheduler e ridurre carico/size sul browser
+
+### Changed
+- **Export behavior:** Client-side Excel export removed; UI now requests exports from the server API so files are generated server-side (matches scheduler output and reduces client-side memory/size issues).
+
+### Fixed
+- L'intervento risolve il blocco in fase di esportazione dei file excel a 1000 righe.
+
+### Removed
+- Removed local SheetJS bundle `app/static/js/xlsx.full.min.js` and related client-side export fallback. Clients must use server-side export endpoint (`POST /api/queries/export`).
