@@ -181,7 +181,8 @@ class PSITTool {
             // Aggiorna barra blu: reset righe e tempo
             const statusBar = document.getElementById('statusConnection');
             if (statusBar) {
-                statusBar.innerHTML = `Connessione: <b>${this.currentConnection || 'Nessuna'}</b> Query: <b>${query.title || query.filename}</b>`;
+                // Mostra solo la connessione; il nome query viene gestito da #statusQuery
+                statusBar.innerHTML = `Connessione: <b>${this.currentConnection || 'Nessuna'}</b>`;
             }
             this.updateStatusBar();
         } catch (error) {
@@ -461,6 +462,22 @@ class PSITTool {
             this.currentConnection = connectionName;
             // Non assumere che sia connessa, testa prima
             this.updateConnectionStatus('testing', connectionName);
+
+            // Ripulisci stato risultati/preview come quando si seleziona una nuova query
+            this.lastResults = null;
+            this.fullResults = null;
+            this.lastResultsIsPreview = false;
+            this.filters = {};
+            this.sorting = {};
+            // Ripulisci anche la query selezionata e UI del form
+            this.currentQuery = null;
+            const parametersSection = document.getElementById('parametersSection');
+            const noQuerySelected = document.getElementById('noQuerySelected');
+            if (parametersSection) parametersSection.classList.add('hidden');
+            if (noQuerySelected) noQuerySelected.classList.remove('hidden');
+            const resultsSection = document.getElementById('resultsSection');
+            if (resultsSection) resultsSection.classList.add('hidden');
+            this.updateStatusBar();
             
             // Testa la connessione in background
             setTimeout(() => {
@@ -470,13 +487,7 @@ class PSITTool {
             // Aggiorna la lista delle query filtrate
             this.renderQueryList();
             
-            // Reset query corrente se non più compatibile
-            const filteredQueries = this.filterQueriesByConnection();
-            if (this.currentQuery && !filteredQueries.some(q => q.filename === this.currentQuery.filename)) {
-                this.currentQuery = null;
-                document.getElementById('parametersSection').classList.add('hidden');
-                document.getElementById('noQuerySelected').classList.remove('hidden');
-            }
+            // La query viene azzerata indipendentemente dalla compatibilità
             
         } catch (error) {
             console.error('Errore nel cambio connessione:', error);
@@ -637,6 +648,10 @@ class PSITTool {
         if (this.currentQuery) {
             statusQuery.classList.remove('hidden');
             statusQueryName.textContent = this.currentQuery.title || this.currentQuery.filename;
+        } else {
+            // Hide and clear query name when no query is selected
+            try { statusQuery.classList.add('hidden'); } catch (e) {}
+            try { statusQueryName.textContent = ''; } catch (e) {}
         }
         
         if (this.lastResults) {
@@ -648,7 +663,9 @@ class PSITTool {
             const count = filteredCount !== null ? filteredCount : this.lastResults.row_count;
             
             recordCount.textContent = filteredCount !== null ? `${count}/${total}` : total.toString();
-            executionTime.textContent = `${this.lastResults.execution_time_ms.toFixed(0)}ms`;
+            const ms = this.lastResults.execution_time_ms || 0;
+            const secs = ms / 1000;
+            executionTime.textContent = `${ms.toFixed(0)}ms (${secs.toFixed(3)}s)`;
             
             // Show preview notice only when last result is flagged as preview and there is no fullResults cached
             const previewElId = 'previewNotice';

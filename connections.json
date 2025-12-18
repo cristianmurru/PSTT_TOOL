@@ -84,6 +84,19 @@
         "username": "${DB_USER_C01-TT2_UFFICIO}",
         "password": "${DB_PASS_C01-TT2_UFFICIO}"
       }
+    },
+    {
+      "name": "C02-TT2_STAMPA",
+      "environment": "produzione",
+      "db_type": "postgresql",
+      "description": "Database PostgreSQL TT2 Stampa",
+      "params": {
+        "host": "ptt20psql06azwe.postgres.database.azure.com",
+        "port": 5432,
+        "service_name": "tt2_stampa",
+        "username": "${DB_USER_C02-TT2_STAMPA}",
+        "password": "${DB_PASS_C02-TT2_STAMPA}"
+      }
     }
   ],
   "scheduling": [

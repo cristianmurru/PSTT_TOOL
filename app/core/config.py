@@ -132,6 +132,8 @@ class Settings(BaseSettings):
     # Scheduler settings
     scheduler_timezone: str = "Europe/Rome"
     daily_reports_hour: int = 6  # Ora di esecuzione report giornalieri
+    # Timeout esecuzione query schedulatore (secondi)
+    scheduler_query_timeout_sec: int = 600  # default 10 minuti
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"

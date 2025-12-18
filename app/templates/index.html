@@ -71,6 +71,22 @@
             </div>
         </nav>
 
+        <!-- Status Bar (moved under top navigation) -->
+        <div id="statusBar" class="status-bar text-white p-3">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between text-sm">
+                <div class="flex items-center space-x-4">
+                    <span id="statusConnection">Connessione: <span class="font-medium">Nessuna</span></span>
+                    <span id="statusQuery" class="hidden">Query: <span class="font-medium" id="statusQueryName"></span></span>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <span id="statusRecords" class="hidden">Righe: <span class="font-medium" id="recordCount">0</span></span>
+                    <span id="statusTime" class="hidden">Tempo: <span class="font-medium" id="executionTime">0ms</span></span>
+                    <span id="statusFilters" class="hidden">Filtri: <span class="font-medium" id="activeFilters">0</span></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Main Content -->
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div class="px-4 py-6 sm:px-0">
@@ -175,21 +191,7 @@
             </div>
         </div>
 
-        <!-- Status Bar -->
-        <div id="statusBar" class="status-bar text-white p-3 mt-8">
-            <div class="max-w-7xl mx-auto flex items-center justify-between text-sm">
-                <div class="flex items-center space-x-4">
-                    <span id="statusConnection">Connessione: <span class="font-medium">Nessuna</span></span>
-                    <span id="statusQuery" class="hidden">Query: <span class="font-medium" id="statusQueryName"></span></span>
-                </div>
-                
-                <div class="flex items-center space-x-4">
-                    <span id="statusRecords" class="hidden">Righe: <span class="font-medium" id="recordCount">0</span></span>
-                    <span id="statusTime" class="hidden">Tempo: <span class="font-medium" id="executionTime">0ms</span></span>
-                    <span id="statusFilters" class="hidden">Filtri: <span class="font-medium" id="activeFilters">0</span></span>
-                </div>
-            </div>
-        </div>
+        
     </div>
 
     <!-- Loading Overlay -->

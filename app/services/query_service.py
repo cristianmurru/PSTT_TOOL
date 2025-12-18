@@ -654,6 +654,14 @@ class QueryService:
             if not connection:
                 return sql
             db_type = connection.db_type.lower()
+            # Rimuove eventuali terminatori di statement (;) alla fine per evitare
+            # di generare "...; LIMIT 1000" che risulta sintatticamente non valido.
+            # Non modifica la semantica della query.
+            if isinstance(sql, str):
+                s = sql.rstrip()
+                while s.endswith(';'):
+                    s = s[:-1].rstrip()
+                sql = s
             sql_upper = sql.upper()
             # Se il db è Oracle, NON aggiungere nulla
             if db_type == "oracle":
@@ -669,7 +677,9 @@ class QueryService:
                 return sql
 
             if db_type in ["postgresql", "mysql"]:
-                return f"{sql} LIMIT {int(limit)}"
+                # Applica il limite in modo sicuro incapsulando la query in una subselect
+                # per evitare qualsiasi interferenza con stringhe o trailing content.
+                return f"SELECT * FROM ({sql}) AS _lim LIMIT {int(limit)}"
             elif db_type == "sqlserver":
                 return re.sub(r'\bSELECT\b', f'SELECT TOP {int(limit)}', sql, count=1, flags=re.IGNORECASE)
             else:
