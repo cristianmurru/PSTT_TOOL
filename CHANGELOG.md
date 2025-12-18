@@ -155,3 +155,24 @@ N/A - Versione iniziale
 
 ### Removed
 - Removed local SheetJS bundle `app/static/js/xlsx.full.min.js` and related client-side export fallback. Clients must use server-side export endpoint (`POST /api/queries/export`).
+
+## [2025-12-18] - Preview sicuro su PostgreSQL/SQL Server, barra di stato migliorata, timeout scheduler aumentato a 10 minuti
+
+### Changed
+- UI: spostata la barra di stato immediatamente sotto la barra superiore per visibilità immediata; allineati i margini laterali con il resto della UI.
+- UI: la barra di stato mostra il tempo in millisecondi e tra parentesi in secondi (es. `2337ms (2.337s)`).
+- UI: quando si cambia connessione, la barra di stato e i risultati vengono ripuliti; il nome query viene nascosto se non selezionata.
+- UI: eliminata la duplicazione del nome query nella barra di stato.
+- Backend: `_add_limit_clause()` ora rimuove eventuali `;` finali prima di applicare limiti, evitando errori sintattici.
+- Backend: per PostgreSQL/MySQL il limite di preview viene applicato incapsulando la query (`SELECT * FROM (<sql>) AS _lim LIMIT N`), prevenendo l’iniezione del `LIMIT` dentro stringhe letterali.
+- Scheduler: aumentato `scheduler_query_timeout_sec` a 600s (10 minuti) per ridurre timeout frequenti in produzione.
+
+### Fixed
+- Query `TT2_STAMPA-PCL-001--RistampeLDV post rerouting.sql`: rimossa `;` finale e normalizzata il filtro `LIKE` per compatibilità con preview limit.
+- `connections.json`: corregta struttura per voce `C02-TT2_STAMPA` (JSON valido).
+
+### Test
+- Esecuzione completa suite: 62 passed, 0 failed.
+
+### Notes
+- Export via UI continua a usare l’endpoint server-side (`POST /api/queries/export`) garantendo dataset completi (senza limiti), allineato al comportamento dello scheduler.
