@@ -60,7 +60,7 @@
                             <label class="form-label">Query</label>
                             <select class="form-input" name="query" id="querySelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[180px] self-stretch">
+                        <div class="flex-1 min-w-[180px] self-stretch text-right">
                             <label class="form-label">Data fine</label>
                             <input type="text" class="form-input" name="end_date" id="endDateInput" placeholder="GG/MM/AAAA">
                         </div>
@@ -93,7 +93,7 @@
                         </div>
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
-                            <select class="form-input" name="days_of_week" id="daysOfWeekSelect" multiple style="height:110px;">
+                            <select class="form-input" name="days_of_week" id="daysOfWeekSelect" multiple style="height:160px;">
                                 <option value="0">Lunedì</option>
                                 <option value="1">Martedì</option>
                                 <option value="2">Mercoledì</option>
@@ -135,7 +135,7 @@
                             <label class="form-label mt-2">Oggetto</label>
                             <input type="text" class="form-input" name="email_subject" id="emailSubjectInput" placeholder="Export scheduler">
                             <label class="form-label mt-2">Corpo mail</label>
-                            <textarea class="form-input" name="email_body" id="emailBodyInput" style="height:90px;"
+                            <textarea class="form-input" name="email_body" id="emailBodyInput" style="height:160px;"
                                 placeholder="Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT">Buongiorno,
 in allegato estrazione relativa l'oggetto, generata da procedura automatica.
 Saluti,
@@ -166,7 +166,7 @@ Report_PSTT</textarea>
                             <label class="form-label">Query</label>
                             <select class="form-input" name="query" id="editQuerySelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[180px] self-stretch">
+                        <div class="flex-1 min-w-[180px] self-stretch text-right">
                             <label class="form-label">Data fine</label>
                             <input type="text" class="form-input" name="end_date" id="editEndDateInput" placeholder="GG/MM/AAAA">
                         </div>
@@ -199,7 +199,7 @@ Report_PSTT</textarea>
                         </div>
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
-                            <select class="form-input" name="days_of_week" id="editDaysOfWeekSelect" multiple style="height:110px;">
+                            <select class="form-input" name="days_of_week" id="editDaysOfWeekSelect" multiple style="height:160px;">
                                 <option value="0">Lunedì</option>
                                 <option value="1">Martedì</option>
                                 <option value="2">Mercoledì</option>
@@ -242,7 +242,7 @@ Report_PSTT</textarea>
                             <label class="form-label mt-2">Oggetto</label>
                             <input type="text" class="form-input" name="email_subject" id="editEmailSubjectInput">
                             <label class="form-label mt-2">Corpo mail</label>
-                            <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:90px;"></textarea>
+                            <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:160px;"></textarea>
                             <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
                         </div>
                     </div>
@@ -280,7 +280,7 @@ Report_PSTT</textarea>
 }
 select.form-input {
     height: 32px;
-    min-width: 320px;
+    min-width: 480px;
     max-width: 100%;
     font-size: 0.95rem;
     padding: 0.25rem 0.5rem;
@@ -308,6 +308,8 @@ select.form-input {
     max-width: 100%;
     overflow-x: auto;
 }
+/* Right-align end date inputs for better readability */
+#endDateInput, #editEndDateInput { text-align: right; }
 /* reduce width of scheduling mode select to avoid overlapping cron input */
 .form-input[name="scheduling_mode"], #editSchedulingModeSelect { max-width: 160px; }
 /* dim labels+fields when disabled to make state clearer */
@@ -358,7 +360,10 @@ function fetchScheduling() {
                     <div>
                         <b>${s.query}</b> <span class="text-sm text-gray-600">(${s.scheduling_mode}${s.cron_expression ? ' • ' + s.cron_expression : ''})</span><br>
                         <span>alle ${s.scheduling_mode==='classic' ? `${String(s.hour).padStart(2,'0')}:${String(s.minute).padStart(2,'0')}` : 'cron' } su <span>${s.connection}</span></span><br>
-                        <span class="text-sm text-gray-500">Template: ${s.output_filename_template || '{query_name}_{date}.xlsx'}</span>
+                        <span class="text-sm text-gray-500">Template: ${s.output_filename_template || '{query_name}_{date}.xlsx'}</span><br>
+                        <span class="text-sm ${s.sharing_mode==='email' ? 'text-blue-600' : 'text-gray-500'}">
+                            ${s.sharing_mode==='email' ? '<i class="fas fa-envelope mr-1"></i>Email' : '<i class="fas fa-folder-open mr-1"></i>Filesystem'}
+                        </span>
                     </div>
                     <div>
                         <button class="btn btn-sm btn-secondary mr-2" onclick="showEditForm(${i})"><i class="fas fa-edit"></i></button>
@@ -429,6 +434,11 @@ function showEditForm(idx) {
     toggleFieldsForMode(document.getElementById('form-edit-schedule'), schedMode);
     const editCronEl = document.querySelector('#edit-form input[name="cron_expression"]');
     if (editCronEl) editCronEl.disabled = schedMode !== 'cron';
+        // ensure sharing box visibility reflects current value immediately
+        const editSharingMode = document.getElementById('editSharingModeSelect');
+        const editEmailBox = document.getElementById('editEmailFieldsBox');
+        const editOutputDirBox = document.getElementById('editOutputDirBox');
+        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
         document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
         document.getElementById('edit-form').style.display = 'block';
         document.getElementById('add-form').style.display = 'none';
@@ -456,6 +466,13 @@ function toggleFieldsForMode(form, mode) {
     if (daysEl) { daysEl.disabled = isCron; const wrap = daysEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (hourEl) { hourEl.disabled = isCron; const wrap = hourEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (minuteEl) { minuteEl.disabled = isCron; const wrap = minuteEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
+}
+
+// helper to show/hide email vs filesystem boxes based on sharing mode (available globally)
+function applySharingBoxVisibility(selectEl, emailBoxEl, dirBoxEl) {
+    if (!selectEl || !emailBoxEl || !dirBoxEl) return;
+    if (selectEl.value === 'email') { emailBoxEl.style.display = 'block'; dirBoxEl.style.display = 'none'; }
+    else { emailBoxEl.style.display = 'none'; dirBoxEl.style.display = 'block'; }
 }
 
 // convert dd/mm/yyyy to yyyy-mm-dd (ISO) or return undefined if empty/invalid
@@ -527,6 +544,8 @@ function setupFormToggles() {
         const addCronInput = cronBox ? cronBox.querySelector('[name="cron_expression"]') : null;
         if (addCronInput) addCronInput.disabled = mode !== 'cron';
         adjustSchedulingSelectWidth(schedulingMode, mode);
+        // initialize sharing visibility for add form
+        applySharingBoxVisibility(sharingMode, emailBox, outputDirBox);
     }
     if (editForm) {
         const mode = editForm.scheduling_mode ? editForm.scheduling_mode.value : 'classic';
@@ -534,6 +553,8 @@ function setupFormToggles() {
         const editCronInputInit = editCronBox ? editCronBox.querySelector('[name="cron_expression"]') : null;
         if (editCronInputInit) editCronInputInit.disabled = mode !== 'cron';
         adjustSchedulingSelectWidth(editSchedulingMode, mode);
+        // initialize sharing visibility for edit form
+        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
     }
 
     // Preview buttons with validation
