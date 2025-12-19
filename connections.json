@@ -143,7 +143,7 @@
         6
       ],
       "hour": 8,
-      "minute": 57,
+      "minute": 0,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -152,7 +152,11 @@
       "output_include_timestamp": false,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
-      "email_recipients": null
+      "email_recipients": null,
+      "email_to": null,
+      "email_cc": null,
+      "email_subject": null,
+      "email_body": null
     },
     {
       "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
@@ -211,7 +215,7 @@
       "days_of_week": null,
       "hour": null,
       "minute": null,
-      "cron_expression": "58 8 * * *",
+      "cron_expression": "59 7 * * *",
       "end_date": null,
       "output_filename_template": "{query_name}.xlsx",
       "output_date_format": "%Y-%m-%d",
@@ -219,7 +223,36 @@
       "output_include_timestamp": true,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
-      "email_recipients": null
+      "email_recipients": null,
+      "email_to": null,
+      "email_cc": null,
+      "email_subject": null,
+      "email_body": null
+    },
+    {
+      "query": "CDG-INF-002--Visualizza Legenda DelReason.sql",
+      "connection": "A00-CDG-Collaudo",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        4
+      ],
+      "hour": 7,
+      "minute": 47,
+      "cron_expression": null,
+      "end_date": null,
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "email",
+      "output_dir": null,
+      "email_recipients": null,
+      "email_to": "cristian.murru@posteitaliane.it",
+      "email_cc": "cristianmurru@gmail.com",
+      "email_subject": "estrazione test",
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
     },
     {
       "query": "test_query.sql",
@@ -238,7 +271,11 @@
       "output_include_timestamp": false,
       "sharing_mode": "filesystem",
       "output_dir": null,
-      "email_recipients": null
+      "email_recipients": null,
+      "email_to": null,
+      "email_cc": null,
+      "email_subject": null,
+      "email_body": null
     }
   ]
 }

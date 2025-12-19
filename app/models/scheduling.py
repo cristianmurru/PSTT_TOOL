@@ -40,7 +40,12 @@ class SchedulingItem(BaseModel):
     # Condivisione file
     sharing_mode: SharingMode = Field(SharingMode.FILESYSTEM, description="Modalità di condivisione: filesystem o email")
     output_dir: Optional[str] = Field(None, description="Percorso directory di esportazione (se filesystem)")
-    email_recipients: Optional[str] = Field(None, description="Destinatari email separati da pipe | (se email)")
+    # Email fields
+    email_recipients: Optional[str] = Field(None, description="[DEPRECATO] Usa email_to. Destinatari email separati da pipe | (compatibilità)")
+    email_to: Optional[str] = Field(None, description="Destinatari A (To), separati da pipe |")
+    email_cc: Optional[str] = Field(None, description="Destinatari CC, separati da pipe |")
+    email_subject: Optional[str] = Field(None, description="Oggetto email personalizzabile")
+    email_body: Optional[str] = Field(None, description="Corpo email plain text")
 
     def render_filename(self, exec_dt: Optional[datetime] = None) -> str:
         """Genera il filename sostituendo i placeholder nel template.

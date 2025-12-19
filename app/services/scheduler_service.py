@@ -42,8 +42,13 @@ class SchedulerService:
         if history_path.exists():
             with open(history_path, "r", encoding="utf-8") as f:
                 all_history = json.load(f)
-            cutoff = datetime.now() - timedelta(days=30)
-            self.execution_history = [h for h in all_history if datetime.fromisoformat(h["timestamp"]) >= cutoff]
+            # Mantieni tutto lo storico in memoria; il filtro dei 30 giorni verrà applicato in API/UI
+            # per evitare perdite di eventi al riavvio.
+            try:
+                self.execution_history = list(all_history)
+            except Exception:
+                # fallback in caso di formato inatteso
+                self.execution_history = []
         else:
             self.execution_history = []
 
@@ -290,7 +295,18 @@ class SchedulerService:
             if sharing == 'email':
                 # prova a inviare via email, se non configurato logga e mantiene il file
                 try:
-                    self._send_email_with_attachment(sched.get('email_recipients'), filepath)
+                    to_field = sched.get('email_to') or sched.get('email_recipients')
+                    cc_field = sched.get('email_cc')
+                    subject = sched.get('email_subject') or f"Export scheduler: {filepath.name}"
+                    # default body standard richiesto
+                    default_body = (
+                        "Buongiorno,\n"
+                        "in allegato estrazione relativa l'oggetto, generata da procedura automatica.\n"
+                        "Saluti,\n"
+                        "Report_PSTT\n"
+                    )
+                    body = sched.get('email_body') or default_body
+                    self._send_email_with_attachment(to_field, filepath, cc_field, subject, body)
                 except Exception:
                     logger.exception("Invio email fallito, file salvato su filesystem")
 
@@ -330,9 +346,12 @@ class SchedulerService:
         except Exception as e:
             logger.warning(f"[SCHEDULER] Impossibile salvare metriche: {e}")
 
-    def _send_email_with_attachment(self, recipients: Optional[str], filepath: Path):
-        """Invia il file come attachment se le impostazioni SMTP sono configurate;
-        i destinatari possono essere separati da pipe '|'. Se SMTP non presente, logga e ritorna.
+    def _send_email_with_attachment(self, recipients: Optional[str], filepath: Path, cc: Optional[str] = None, subject: Optional[str] = None, body: Optional[str] = None):
+        """Invia il file come attachment se le impostazioni SMTP sono configurate.
+        - `recipients`: lista To separata da pipe '|'
+        - `cc`: lista CC separata da pipe '|'
+        - `subject`: oggetto email
+        - `body`: corpo email plain text
         """
         settings = get_settings()
         smtp_host = getattr(settings, 'smtp_host', None)
@@ -351,12 +370,18 @@ class SchedulerService:
 
         # prepara messaggio
         msg = EmailMessage()
-        msg['Subject'] = f"Export scheduler: {filepath.name}"
+        msg['Subject'] = subject or f"Export scheduler: {filepath.name}"
         msg['From'] = smtp_from
         # destinatari separati da pipe
         tos = [r.strip() for r in recipients.split('|') if r.strip()]
         msg['To'] = ', '.join(tos)
-        msg.set_content(f"In allegato il file generato dal scheduler: {filepath.name}")
+        # CC
+        if cc:
+            ccs = [c.strip() for c in cc.split('|') if c.strip()]
+            if ccs:
+                msg['Cc'] = ', '.join(ccs)
+        # body
+        msg.set_content(body or f"In allegato il file generato dal scheduler: {filepath.name}")
 
         with open(filepath, 'rb') as f:
             data = f.read()

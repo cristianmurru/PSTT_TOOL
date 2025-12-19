@@ -127,9 +127,20 @@
                             <label class="form-label">Output directory</label>
                             <input type="text" class="form-input" name="output_dir" id="outputDirInput" placeholder="C:\App\PSTT_TOOL\Exports">
                         </div>
-                        <div class="flex-1 min-w-[320px]" id="emailRecipientsBox" style="display:none;">
-                            <label class="form-label">Email destinatari (pipe | separatore)</label>
-                            <input type="text" class="form-input" name="email_recipients" id="emailRecipientsInput" placeholder="a@x.com|b@y.com">
+                        <div class="flex-1 min-w-[320px]" id="emailFieldsBox" style="display:none;">
+                            <label class="form-label">Destinatari A (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_to" id="emailToInput" placeholder="a@x.com|b@y.com">
+                            <label class="form-label mt-2">Destinatari CC (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_cc" id="emailCcInput" placeholder="c@x.com|d@y.com">
+                            <label class="form-label mt-2">Oggetto</label>
+                            <input type="text" class="form-input" name="email_subject" id="emailSubjectInput" placeholder="Export scheduler">
+                            <label class="form-label mt-2">Corpo mail</label>
+                            <textarea class="form-input" name="email_body" id="emailBodyInput" style="height:90px;"
+                                placeholder="Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT">Buongiorno,
+in allegato estrazione relativa l'oggetto, generata da procedura automatica.
+Saluti,
+Report_PSTT</textarea>
+                            <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
                         </div>
                     </div>
                     <div class="flex gap-3 mb-2">
@@ -223,9 +234,16 @@
                             <label class="form-label">Output directory</label>
                             <input type="text" class="form-input" name="output_dir" id="editOutputDirInput" placeholder="C:\App\PSTT_TOOL\Exports">
                         </div>
-                        <div class="flex-1 min-w-[320px]" id="editEmailRecipientsBox" style="display:none;">
-                            <label class="form-label">Email destinatari (pipe | separatore)</label>
-                            <input type="text" class="form-input" name="email_recipients" id="editEmailRecipientsInput">
+                        <div class="flex-1 min-w-[320px]" id="editEmailFieldsBox" style="display:none;">
+                            <label class="form-label">Destinatari A (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_to" id="editEmailToInput">
+                            <label class="form-label mt-2">Destinatari CC (pipe | separatore)</label>
+                            <input type="text" class="form-input" name="email_cc" id="editEmailCcInput">
+                            <label class="form-label mt-2">Oggetto</label>
+                            <input type="text" class="form-input" name="email_subject" id="editEmailSubjectInput">
+                            <label class="form-label mt-2">Corpo mail</label>
+                            <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:90px;"></textarea>
+                            <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
                         </div>
                     </div>
                     <div class="flex gap-3 mb-2">
@@ -394,8 +412,15 @@ function showEditForm(idx) {
         if (editSharing) editSharing.value = s.sharing_mode || 'filesystem';
         const editOutDir = document.querySelector('#edit-form input[name="output_dir"]');
         if (editOutDir) editOutDir.value = s.output_dir || '';
-        const editEmails = document.querySelector('#edit-form input[name="email_recipients"]');
-        if (editEmails) editEmails.value = s.email_recipients || '';
+        // populate email fields
+        const editEmailTo = document.querySelector('#edit-form input[name="email_to"]');
+        if (editEmailTo) editEmailTo.value = s.email_to || s.email_recipients || '';
+        const editEmailCc = document.querySelector('#edit-form input[name="email_cc"]');
+        if (editEmailCc) editEmailCc.value = s.email_cc || '';
+        const editEmailSubject = document.querySelector('#edit-form input[name="email_subject"]');
+        if (editEmailSubject) editEmailSubject.value = s.email_subject || '';
+        const editEmailBody = document.querySelector('#edit-form textarea[name="email_body"]');
+        if (editEmailBody) editEmailBody.value = s.email_body || '';
         const daysSelect = document.getElementById('editDaysOfWeekSelect');
         Array.from(daysSelect.options).forEach(opt => {
             opt.selected = s.days_of_week && s.days_of_week.includes(parseInt(opt.value));
@@ -479,7 +504,7 @@ function setupFormToggles() {
 
     const sharingMode = document.getElementById('sharingModeSelect');
     const outputDirBox = document.getElementById('outputDirBox');
-    const emailBox = document.getElementById('emailRecipientsBox');
+    const emailBox = document.getElementById('emailFieldsBox');
     sharingMode?.addEventListener('change', () => {
         if (sharingMode.value === 'email') { emailBox.style.display = 'block'; outputDirBox.style.display = 'none'; }
         else { emailBox.style.display = 'none'; outputDirBox.style.display = 'block'; }
@@ -487,7 +512,7 @@ function setupFormToggles() {
 
     const editSharingMode = document.getElementById('editSharingModeSelect');
     const editOutputDirBox = document.getElementById('editOutputDirBox');
-    const editEmailBox = document.getElementById('editEmailRecipientsBox');
+    const editEmailBox = document.getElementById('editEmailFieldsBox');
     editSharingMode?.addEventListener('change', () => {
         if (editSharingMode.value === 'email') { editEmailBox.style.display = 'block'; editOutputDirBox.style.display = 'none'; }
         else { editEmailBox.style.display = 'none'; editOutputDirBox.style.display = 'block'; }
@@ -604,7 +629,11 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
         sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
-        email_recipients: form.email_recipients ? form.email_recipients.value || undefined : undefined
+        // email fields (UI)
+        email_to: form.email_to ? form.email_to.value || undefined : undefined,
+        email_cc: form.email_cc ? form.email_cc.value || undefined : undefined,
+        email_subject: form.email_subject ? form.email_subject.value || undefined : undefined,
+        email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
     fetch('/api/scheduler/scheduling', {
         method: 'POST',
@@ -638,7 +667,11 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
         sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
-        email_recipients: form.email_recipients ? form.email_recipients.value || undefined : undefined
+        // email fields (UI)
+        email_to: form.email_to ? form.email_to.value || undefined : undefined,
+        email_cc: form.email_cc ? form.email_cc.value || undefined : undefined,
+        email_subject: form.email_subject ? form.email_subject.value || undefined : undefined,
+        email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
     fetch(`/api/scheduler/scheduling/${idx}`, {
         method: 'PUT',
