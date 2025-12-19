@@ -376,6 +376,7 @@ class SchedulerService:
         tos = [r.strip() for r in recipients.split('|') if r.strip()]
         msg['To'] = ', '.join(tos)
         # CC
+        ccs = []
         if cc:
             ccs = [c.strip() for c in cc.split('|') if c.strip()]
             if ccs:
@@ -396,8 +397,14 @@ class SchedulerService:
                 pass
             if smtp_user and smtp_password:
                 s.login(smtp_user, smtp_password)
-            s.send_message(msg)
-            logger.info(f"Email inviata a: {tos}")
+            # Includi esplicitamente To+Cc nella envelope list per garantire consegna CC
+            all_rcpts = tos + ccs
+            try:
+                s.send_message(msg, to_addrs=all_rcpts)
+            except Exception:
+                # fallback conservativo
+                s.sendmail(smtp_from, all_rcpts, msg.as_string())
+            logger.info(f"Email inviata - To: {tos} | Cc: {ccs}")
     
     async def cleanup_old_exports(self):
         try:
