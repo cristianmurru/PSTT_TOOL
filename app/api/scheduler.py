@@ -170,7 +170,24 @@ async def get_scheduler_history():
         return {"history": [], "total_count": 0}
     try:
         with open(history_path, "r", encoding="utf-8") as f:
-            history = json.load(f)
+            history_all = json.load(f)
+        # Applica filtro ultimi 30 giorni lato API
+        from datetime import datetime, timedelta
+        cutoff = datetime.now() - timedelta(days=30)
+        history = []
+        for h in history_all:
+            try:
+                ts = h.get("timestamp")
+                if ts:
+                    dt = datetime.fromisoformat(ts)
+                    if dt >= cutoff:
+                        history.append(h)
+                else:
+                    # se timestamp mancante, includi per compatibilità
+                    history.append(h)
+            except Exception:
+                # se parsing timestamp fallisce, includi comunque
+                history.append(h)
         return {"history": history, "total_count": len(history)}
     except Exception as e:
         return JSONResponse(status_code=500, content={"detail": f"Errore lettura storico: {e}"})
