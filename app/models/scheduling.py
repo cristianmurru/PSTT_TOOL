@@ -47,8 +47,8 @@ class SchedulingItem(BaseModel):
     email_subject: Optional[str] = Field(None, description="Oggetto email personalizzabile")
     email_body: Optional[str] = Field(None, description="Corpo email plain text")
 
-    def render_filename(self, exec_dt: Optional[datetime] = None) -> str:
-        """Genera il filename sostituendo i placeholder nel template.
+    def _build_token_replacements(self, exec_dt: Optional[datetime] = None) -> dict:
+        """Costruisce dizionario di sostituzione token comuni.
 
         Supportati: {query_name}, {date}, {date-1}, {timestamp}
         """
@@ -56,23 +56,48 @@ class SchedulingItem(BaseModel):
         # apply offset
         target_date = (dt + timedelta(days=self.output_offset_days)).date()
         # preserva trattini e underscore, rimuovi altri caratteri non alfanumerici
-        qname = self.query.replace('.sql','')
+        qname = self.query.replace('.sql', '')
         qname = re.sub(r"[^0-9A-Za-z_\-]+", "_", qname)
+        
         replacements = {
             "query_name": qname,
             "date": target_date.strftime(self.output_date_format or "%Y-%m-%d"),
             "timestamp": dt.strftime('%Y-%m-%d_%H-%M')
         }
+        
         # support {date-1} pattern
-        if "{date-1}" in (self.output_filename_template or ""):
-            d_minus_1 = (dt + timedelta(days=self.output_offset_days-1)).date()
-            replacements["date-1"] = d_minus_1.strftime(self.output_date_format or "%Y-%m-%d")
+        d_minus_1 = (dt + timedelta(days=self.output_offset_days - 1)).date()
+        replacements["date-1"] = d_minus_1.strftime(self.output_date_format or "%Y-%m-%d")
+        
+        return replacements
 
+    def render_string(self, template: str, exec_dt: Optional[datetime] = None) -> str:
+        """Sostituisce i token in una stringa generica.
+
+        Supportati: {query_name}, {date}, {date-1}, {timestamp}
+        """
+        if not template:
+            return template
+        
+        replacements = self._build_token_replacements(exec_dt)
+        result = template
+        for k, v in replacements.items():
+            result = result.replace(f"{{{k}}}", str(v))
+        return result
+
+    def render_filename(self, exec_dt: Optional[datetime] = None) -> str:
+        """Genera il filename sostituendo i placeholder nel template.
+
+        Supportati: {query_name}, {date}, {date-1}, {timestamp}
+        """
+        replacements = self._build_token_replacements(exec_dt)
         tpl = self.output_filename_template or "{query_name}_{date}.xlsx"
+        
         # simple replacement
         fname = tpl
         for k, v in replacements.items():
             fname = fname.replace(f"{{{k}}}", str(v))
+        
         # if timestamp requested but not in template, append if flag set
         if self.output_include_timestamp and "{timestamp}" not in fname:
             fname = f"{fname.rstrip('.xlsx')}_{replacements['timestamp']}.xlsx"
