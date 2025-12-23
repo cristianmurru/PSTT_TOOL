@@ -82,6 +82,41 @@ La configurazione delle schedulazioni avviene nel file `connections.json` nella 
 
 ---
 
+## Template Filename e Token
+
+Il campo `output_filename_template` supporta i seguenti token per generare nomi file dinamici:
+
+- **{query_name}**: Nome della query (senza estensione `.sql`)
+- **{date}**: Data corrente nel formato specificato (default: `YYYY-MM-DD`)
+- **{date-1}**: Data del giorno precedente
+- **{timestamp}**: Timestamp completo (`YYYY-MM-DD_HH-MM`)
+
+### Token in Oggetto e Corpo Email (v1.0.3+)
+
+A partire dalla versione 1.0.3, i token disponibili per il filename possono essere utilizzati anche nei campi email:
+
+- **email_subject**: Oggetto dell'email può contenere token
+- **email_body**: Corpo dell'email può contenere token
+
+**Esempi:**
+
+```json
+{
+  "query": "TT2_STAMPA-PCL-001--Ristampa LdV.sql",
+  "connection": "TT2_STAMPA",
+  "output_filename_template": "{query_name}_{date}.xlsx",
+  "email_subject": "TEST Report ristampa LdV dopo Rerouting del {date-1}",
+  "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\n{date}\nSaluti,\nReport_PSTT"
+}
+```
+
+Con esecuzione del 23/12/2025:
+- Filename: `TT2_STAMPA-PCL-001--Ristampa_LdV_2025-12-23.xlsx`
+- Subject: `TEST Report ristampa LdV dopo Rerouting del 2025-12-22`
+- Body: testo con `{date}` sostituito da `2025-12-23`
+
+---
+
 ## Troubleshooting
 - Se una query non viene eseguita, verifica che il nome sia corretto e che la connessione sia attiva.
 - Controlla i log per eventuali errori di esecuzione o di connessione.

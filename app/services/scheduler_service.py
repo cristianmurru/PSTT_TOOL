@@ -297,7 +297,7 @@ class SchedulerService:
                 try:
                     to_field = sched.get('email_to') or sched.get('email_recipients')
                     cc_field = sched.get('email_cc')
-                    subject = sched.get('email_subject') or f"Export scheduler: {filepath.name}"
+                    subject_raw = sched.get('email_subject') or f"Export scheduler: {filepath.name}"
                     # default body standard richiesto
                     default_body = (
                         "Buongiorno,\n"
@@ -305,7 +305,14 @@ class SchedulerService:
                         "Saluti,\n"
                         "Report_PSTT\n"
                     )
-                    body = sched.get('email_body') or default_body
+                    body_raw = sched.get('email_body') or default_body
+                    
+                    # Sostituisci token in subject e body usando il metodo del modello
+                    from app.models.scheduling import SchedulingItem
+                    sched_item = SchedulingItem(**sched)
+                    subject = sched_item.render_string(subject_raw)
+                    body = sched_item.render_string(body_raw)
+                    
                     self._send_email_with_attachment(to_field, filepath, cc_field, subject, body)
                 except Exception:
                     logger.exception("Invio email fallito, file salvato su filesystem")
