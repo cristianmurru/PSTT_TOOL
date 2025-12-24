@@ -165,7 +165,7 @@ N/A - Versione iniziale
 - UI: eliminata la duplicazione del nome query nella barra di stato.
 - Backend: `_add_limit_clause()` ora rimuove eventuali `;` finali prima di applicare limiti, evitando errori sintattici.
 - Backend: per PostgreSQL/MySQL il limite di preview viene applicato incapsulando la query (`SELECT * FROM (<sql>) AS _lim LIMIT N`), prevenendo l’iniezione del `LIMIT` dentro stringhe letterali.
-- Scheduler: aumentato `scheduler_query_timeout_sec` a 600s (10 minuti) per ridurre timeout frequenti in produzione.
+- Scheduler: aumentato `scheduler_query_timeout_sec` a 900s (15 minuti) per ridurre timeout frequenti in produzione.
 
 ### Fixed
 - Query `TT2_STAMPA-PCL-001--RistampeLDV post rerouting.sql`: rimossa `;` finale e normalizzata il filtro `LIKE` per compatibilità con preview limit.
@@ -176,3 +176,65 @@ N/A - Versione iniziale
 
 ### Notes
 - Export via UI continua a usare l’endpoint server-side (`POST /api/queries/export`) garantendo dataset completi (senza limiti), allineato al comportamento dello scheduler.
+
+## [2025-12-23] - Token Replacement in Email Subject/Body
+
+### Added
+- **Scheduler Token Replacement**: I token disponibili per il filename (`{query_name}`, `{date}`, `{date-1}`, `{timestamp}`) ora possono essere utilizzati anche nell'oggetto e nel corpo delle email
+  - Nuovo metodo `render_string()` in `SchedulingItem` per sostituzione token in stringhe generiche
+  - Metodo helper `_build_token_replacements()` per centralizzare la logica di generazione token
+  - Sostituzione automatica applicata a `email_subject` e `email_body` prima dell'invio email
+
+### Changed
+- `app/models/scheduling.py`: refactoring del metodo `render_filename()` per riutilizzare la logica comune con helper `_build_token_replacements()`
+- `app/services/scheduler_service.py`: subject e body email ora processati tramite `render_string()` prima dell'invio
+
+### Example
+- Subject: `"IV dopo Rerouting del {date-1}"` → `"IV dopo Rerouting del 2025-12-22"`
+- Body: `"Estrazione del {date} per {query_name}"` → `"Estrazione del 2025-12-23 per TEST_REPORT"`
+
+## [2025-12-19] - Campi Email nello Scheduler e storico schedulazioni ripristinato
+
+### Added
+- Scheduler UI: aggiunti campi email per invio via scheduler — `Destinatari A (email_to)`, `Destinatari CC (email_cc)`, `Oggetto (email_subject)`, `Corpo (email_body)`.
+- Default corpo email: applicato lo standard richiesto.
+
+### Changed
+- Modello `SchedulingItem`: introdotti i nuovi campi; `email_recipients` mantenuto per compatibilità come fallback.
+- Config loader: normalizzazione dei nuovi campi da `connections.json`, con preferenza per `email_to` se presente.
+- SchedulerService: l’invio email usa To/CC/Subject/Body; subject di default basato sul filename se non fornito.
+- API `/api/scheduler/history`: applica il filtro “ultimi 30 giorni” lato API.
+
+### Fixed
+- Storico schedulazioni: non viene più troncato all’avvio del servizio; ora viene mantenuto integralmente su file e filtrato solo in risposta API.
+- Invio email CC: i destinatari in `email_cc` sono ora inclusi nell’envelope SMTP (oltre che nell’header) garantendo la consegna; logging migliorato (To + Cc).
+
+### UI
+- `scheduler_dashboard.html`: form “Aggiungi/Modifica” aggiornata con i nuovi campi email e placeholder con il testo standard.
+- Lista schedulazioni: visualizza la modalità di condivisione (Filesystem/Email) con icona.
+- Modifica schedulazione: i campi Email sono visibili immediatamente quando la schedulazione è in modalità Email.
+- Layout: campo “Data fine” allineato a destra; dropdown Query più largo; elenco giorni della settimana con altezza sufficiente per mostrarli tutti; textarea “Corpo mail” più alta per visibilità completa del testo di default.
+
+### Test
+- Suite completa: 62 passed, 0 failed.
+
+### Ops
+- Aggiornata guida di deploy con note per email (SMTP) e nuovi campi di schedulazione.
+- Documentazione setup consolidata: ripristinato `Setup/Update R20251218.md`; `Setup/Update R20251219.md` presente per test/manuale, contenente riepilogo delle novità.
+
+## [2025-12-24] - Scheduler UI allineata, filtro Query per Connessione, fix stabilità
+
+### Changed
+- Scheduler UI: il campo Query in Aggiungi/Modifica ora si popola dinamicamente solo con le query compatibili con la connessione selezionata (matching token `CDG`, `BOSC`, `TT2_UFFICIO`, ecc.).
+- Layout coerente tra Aggiungi e Modifica: prima riga (Connessione, Query, Data fine) resa con la stessa griglia; uniformati label e help di "Cron expression"; rimossi ID errati che causavano stili incoerenti.
+- UI minori: i `select` rispettano la larghezza della colonna evitando sovrapposizioni.
+
+### Fixed
+- Scheduler Service: risolto `UnboundLocalError` in `run_scheduled_query()` dovuto a import locale di `SchedulingItem`. Ora l'import è a livello di modulo e il rendering del filename usa sempre il modello.
+- Config: disabilitata la schedulazione legacy `test_query.sql` in `connections.json` per evitare errori di runtime quando il file di test non è presente (la suite di test genera un file temporaneo quando necessario).
+
+### Test
+- Suite completa: 62 passed, 0 failed.
+
+### Notes
+- Il filtro Query per Connessione replica il comportamento della home: il token nel nome connessione determina le query mostrate.

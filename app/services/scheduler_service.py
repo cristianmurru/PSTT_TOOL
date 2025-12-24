@@ -307,8 +307,7 @@ class SchedulerService:
                     )
                     body_raw = sched.get('email_body') or default_body
                     
-                    # Sostituisci token in subject e body usando il metodo del modello
-                    from app.models.scheduling import SchedulingItem
+                    # Sostituisci token in subject e body usando il metodo del modello (import già a livello modulo)
                     sched_item = SchedulingItem(**sched)
                     subject = sched_item.render_string(subject_raw)
                     body = sched_item.render_string(body_raw)

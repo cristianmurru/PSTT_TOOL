@@ -257,7 +257,7 @@
     {
       "query": "test_query.sql",
       "connection": "test_conn",
-      "enabled": true,
+      "enabled": false,
       "description": null,
       "scheduling_mode": "classic",
       "days_of_week": null,
