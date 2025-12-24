@@ -51,21 +51,21 @@
             <div id="add-form" style="display:none;" class="mt-6">
                 <h5 class="font-semibold mb-2">Aggiungi nuova schedulazione</h5>
                 <form id="form-add-schedule">
-                    <div class="flex flex-wrap gap-4 mb-2">
-                        <div class="flex-1 min-w-[220px]">
+                    <div id="addFirstRow" class="flex flex-wrap gap-4 mb-2">
+                        <div id="addConnectionBox" class="flex-1 min-w-[220px]">
                             <label class="form-label">Connessione</label>
                             <select class="form-input" name="connection" id="connectionSelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[220px]">
+                        <div id="addQueryBox" class="flex-1 min-w-[220px]">
                             <label class="form-label">Query</label>
                             <select class="form-input" name="query" id="querySelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[180px] self-stretch text-right">
+                        <div id="addEndDateBox" class="flex-1 min-w-[180px] self-stretch text-right">
                             <label class="form-label">Data fine</label>
                             <input type="text" class="form-input" name="end_date" id="endDateInput" placeholder="GG/MM/AAAA">
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-4 mb-2">
+                    <div id="addModeRow" class="flex flex-wrap gap-4 mb-2">
                         <div class="flex-1 min-w-[220px]">
                             <label class="form-label">Modalità scheduling</label>
                             <select class="form-input" name="scheduling_mode" id="schedulingModeSelect">
@@ -158,16 +158,16 @@ Report_PSTT</textarea>
                     <em id="edit-schedule-name" class="text-gray-500 ml-2"></em>
                 </h5>
                 <form id="form-edit-schedule">
-                    <div class="flex flex-wrap gap-4 mb-2">
-                        <div class="flex-1 min-w-[220px]">
+                    <div id="editFirstRow" class="flex flex-wrap gap-4 mb-2">
+                        <div id="editConnectionBox" class="flex-1 min-w-[220px]">
                             <label class="form-label">Connessione</label>
                             <select class="form-input" name="connection" id="editConnectionSelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[220px]">
+                        <div id="editQueryBox" class="flex-1 min-w-[220px]">
                             <label class="form-label">Query</label>
                             <select class="form-input" name="query" id="editQuerySelect" required></select>
                         </div>
-                        <div class="flex-1 min-w-[180px] self-stretch text-right">
+                        <div id="editEndDateBox" class="flex-1 min-w-[180px] self-stretch text-right">
                             <label class="form-label">Data fine</label>
                             <input type="text" class="form-input" name="end_date" id="editEndDateInput" placeholder="GG/MM/AAAA">
                         </div>
@@ -282,7 +282,8 @@ Report_PSTT</textarea>
 }
 select.form-input {
     height: 32px;
-    min-width: 480px;
+    width: 100%;
+    min-width: 0; /* consenti di adattarsi alla colonna della griglia */
     max-width: 100%;
     font-size: 0.95rem;
     padding: 0.25rem 0.5rem;
@@ -317,6 +318,14 @@ select.form-input {
 /* dim labels+fields when disabled to make state clearer */
 .field-disabled { opacity: 0.5; }
 .form-input:disabled { background-color: #f9fafb; cursor: not-allowed; }
+/* layout tuning: first row (Connessione, Query, Data fine) as grid to avoid overlap */
+#addFirstRow, #editFirstRow { 
+    display: grid !important; 
+    grid-template-columns: 300px 520px 160px; 
+    column-gap: 12px; 
+    align-items: end; 
+}
+#addFirstRow .form-input, #editFirstRow .form-input { width: 100%; }
 </style>
 <script>
 let schedulingData = [];
@@ -340,10 +349,9 @@ function fetchQueries() {
         .then(r => r.json())
         .then(data => {
             queries = data.queries || [];
-            const select = document.getElementById('querySelect');
-            select.innerHTML = queries.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
-            const editSelect = document.getElementById('editQuerySelect');
-            editSelect.innerHTML = queries.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
+            // popolamento rinviato ai cambi di connessione per filtrare le query disponibili
+            updateQuerySelectByConnection('connectionSelect', 'querySelect');
+            updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect');
         });
 }
 
@@ -379,6 +387,17 @@ function fetchScheduling() {
 function showAddForm() {
     document.getElementById('add-form').style.display = 'block';
     document.getElementById('edit-form').style.display = 'none';
+    // assicura che i dropdown siano popolati e porta il focus al primo campo
+    try { fetchConnections(); } catch(e){}
+    try { fetchQueries(); } catch(e){}
+    setTimeout(() => {
+        const addFormEl = document.getElementById('add-form');
+        if (addFormEl) addFormEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const firstField = document.getElementById('connectionSelect') || document.getElementById('querySelect');
+        if (firstField) firstField.focus();
+        // inizializza le query in base alla connessione selezionata
+        updateQuerySelectByConnection('connectionSelect', 'querySelect');
+    }, 50);
 }
 
 function hideAddForm() {
@@ -444,6 +463,13 @@ function showEditForm(idx) {
         document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
         document.getElementById('edit-form').style.display = 'block';
         document.getElementById('add-form').style.display = 'none';
+        // porta l'attenzione dell'utente sul form di modifica
+        const editFormEl = document.getElementById('edit-form');
+        if (editFormEl) editFormEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        const firstEditField = document.getElementById('editConnectionSelect') || document.getElementById('editQuerySelect');
+        if (firstEditField) firstEditField.focus();
+        // filtra le query in base alla connessione corrente e ripristina la selezione
+        updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect', s.query);
     }, 100);
 }
 
@@ -548,6 +574,10 @@ function setupFormToggles() {
         adjustSchedulingSelectWidth(schedulingMode, mode);
         // initialize sharing visibility for add form
         applySharingBoxVisibility(sharingMode, emailBox, outputDirBox);
+        // bind dinamico: quando cambia connessione, filtra le query
+        document.getElementById('connectionSelect')?.addEventListener('change', () => {
+            updateQuerySelectByConnection('connectionSelect', 'querySelect');
+        });
     }
     if (editForm) {
         const mode = editForm.scheduling_mode ? editForm.scheduling_mode.value : 'classic';
@@ -557,6 +587,10 @@ function setupFormToggles() {
         adjustSchedulingSelectWidth(editSchedulingMode, mode);
         // initialize sharing visibility for edit form
         applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
+        // bind dinamico: quando cambia connessione (edit), filtra le query
+        document.getElementById('editConnectionSelect')?.addEventListener('change', () => {
+            updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect');
+        });
     }
 
     // Preview buttons with validation
@@ -846,6 +880,44 @@ try {
     }
 } catch (e) {
     console.warn('flatpickr init failed', e);
+}
+</script>
+
+<script>
+// --- Mapping e filtro query per connessione (come in home) ---
+function extractConnToken(connName) {
+    if (!connName) return undefined;
+    // estrae il token tra il primo '-' e il successivo (es.: A00-CDG-Collaudo -> CDG, C01-TT2_UFFICIO -> TT2_UFFICIO)
+    const m = String(connName).match(/^[A-Z0-9]+-([A-Z0-9_]+)/i);
+    return m ? m[1].toUpperCase() : undefined;
+}
+
+function extractQueryToken(filename) {
+    if (!filename) return undefined;
+    // token prima del primo '-' (es.: CDG-NXV-006--Mazzetti... -> CDG, TT2_UFFICIO-TEST-001 -> TT2_UFFICIO)
+    const m = String(filename).match(/^([A-Z0-9_]+)-/i);
+    return m ? m[1].toUpperCase() : undefined;
+}
+
+function filterQueriesForConnection(connName) {
+    const token = extractConnToken(connName);
+    if (!token) return queries; // fallback: tutte
+    return (queries || []).filter(q => extractQueryToken(q.filename) === token);
+}
+
+function updateQuerySelectByConnection(connSelectId, querySelectId, preferredValue) {
+    const connSelect = document.getElementById(connSelectId);
+    const querySelect = document.getElementById(querySelectId);
+    if (!connSelect || !querySelect) return;
+    const filtered = filterQueriesForConnection(connSelect.value);
+    const optionsHtml = filtered.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
+    querySelect.innerHTML = optionsHtml || (queries || []).map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
+    // ripristina la selezione se disponibile
+    if (preferredValue) {
+        querySelect.value = preferredValue;
+    } else if (!querySelect.value && filtered.length) {
+        querySelect.value = filtered[0].filename;
+    }
 }
 </script>
 
