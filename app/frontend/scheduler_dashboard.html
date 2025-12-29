@@ -455,6 +455,16 @@ function showAddForm() {
         if (firstField) firstField.focus();
         // inizializza le query in base alla connessione selezionata
         updateQuerySelectByConnection('connectionSelect', 'querySelect');
+        // precompila campi email nel form Aggiungi se vuoti
+        try {
+            const form = document.getElementById('form-add-schedule');
+            if (form) {
+                const subj = form.querySelector('input[name="email_subject"]');
+                const body = form.querySelector('textarea[name="email_body"]');
+                if (subj && !subj.value) subj.value = 'Export scheduler';
+                if (body && !body.value) body.value = 'Buongiorno,\nin allegato estrazione relativa l\'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT';
+            }
+        } catch(_){}
     }, 50);
 }
 
@@ -611,6 +621,16 @@ function setupFormToggles() {
     sharingMode?.addEventListener('change', () => {
         if (sharingMode.value === 'email') { emailBox.style.display = 'block'; outputDirBox.style.display = 'none'; }
         else { emailBox.style.display = 'none'; outputDirBox.style.display = 'block'; }
+        // quando si passa a Email, precompila soggetto/corpo se vuoti
+        if (sharingMode.value === 'email') {
+            const form = document.getElementById('form-add-schedule');
+            if (form) {
+                const subj = form.querySelector('input[name="email_subject"]');
+                const body = form.querySelector('textarea[name="email_body"]');
+                if (subj && !subj.value) subj.value = 'Export scheduler';
+                if (body && !body.value) body.value = 'Buongiorno,\nin allegato estrazione relativa l\'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT';
+            }
+        }
     });
 
     const editSharingMode = document.getElementById('editSharingModeSelect');
