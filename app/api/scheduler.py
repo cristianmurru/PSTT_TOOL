@@ -121,10 +121,6 @@ async def delete_scheduling(idx: int, request: Request):
     if idx < 0 or idx >= len(scheduling):
         raise HTTPException(status_code=404, detail="Indice schedulazione non trovato")
     removed = scheduling.pop(idx)
-    # Rimuovi eventuali duplicati con lo stesso nome di query
-    qname = removed.get('query') if isinstance(removed, dict) else None
-    if qname:
-        scheduling = [s for s in scheduling if s.get('query') != qname]
     try:
         cf = settings.connections_file
         with open(cf, 'r', encoding='utf-8') as f:

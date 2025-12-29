@@ -21,4 +21,7 @@ def test_add_edit_delete_schedule():
     r = client.delete(f"/api/scheduler/scheduling/{idx}")
     assert r.status_code == 200
     data = r.json()
-    assert not any(s["query"] == "test_query.sql" for s in data["scheduling"])
+    # Verifica che sia stata rimossa solo la schedulazione target
+    remaining = [s for s in data["scheduling"] if s["query"] == "test_query.sql"]
+    # non deve esistere la versione modificata (conn test_conn2)
+    assert not any(s["query"] == "test_query.sql" and s.get("connection") == "test_conn2" for s in remaining)

@@ -168,6 +168,10 @@ N/A - Versione iniziale
 - Scheduler: aumentato `scheduler_query_timeout_sec` a 900s (15 minuti) per ridurre timeout frequenti in produzione.
 
 ### Fixed
+- Query `TT2_STAMPA-PCL-001--Ristampe
+- Scheduler: aumentato `scheduler_query_timeout_sec` a 900s (15 minuti) per ridurre timeout frequenti in produzione.
+
+### Fixed
 - Query `TT2_STAMPA-PCL-001--RistampeLDV post rerouting.sql`: rimossa `;` finale e normalizzata il filtro `LIKE` per compatibilità con preview limit.
 - `connections.json`: corregta struttura per voce `C02-TT2_STAMPA` (JSON valido).
 
@@ -238,3 +242,23 @@ N/A - Versione iniziale
 
 ### Notes
 - Il filtro Query per Connessione replica il comportamento della home: il token nel nome connessione determina le query mostrate.
+
+## [2025-12-29] - Refinement Scheduler UI + API delete fix (feature/R20251219)
+
+### Changed
+- `app/frontend/scheduler_dashboard.html`: ulteriori affinamenti layout Aggiungi/Modifica schedulazioni.
+  - "Output directory" spostata più vicino a "Condivisione" e allineata a sinistra con "Query"; si estende fino al bordo destro allineato alla listbox "Giorni della settimana".
+  - In modalità Email, i campi `email_to`, `email_cc`, `email_subject`, `email_body` occupano tutta la colonna destra fino al bordo, mantenendo l'allineamento con Query.
+  - Campo "Data fine" allineato a destra con bordo che coincide con quello della listbox "Giorni della settimana".
+  - Spaziature migliorate tra la colonna "Condivisione" e i campi a destra per maggiore leggibilità.
+- UI elenco schedulazioni: anteprima "Data fine validità" evidenziata in rosso se scaduta.
+
+### Fixed
+- `app/api/scheduler.py`: l'endpoint `DELETE /api/scheduler/scheduling/{idx}` ora rimuove esclusivamente la schedulazione selezionata (per indice) senza eliminare altre schedulazioni con la stessa query. Evita cancellazioni multiple indesiderate quando esistono modalità diverse (classic/cron) per la stessa query.
+
+### Test
+- Pytest: suite completa verde (62 passed).
+- Aggiunte verifiche di non‑regressione per l'allineamento dei bordi destri e per le spaziature tra colonne nella dashboard scheduler.
+
+### Branch
+- Lavoro svolto e integrato su `feature/R20251219`.
