@@ -239,13 +239,13 @@ Report_PSTT</textarea>
                         </div>
                         <div id="editEmailFieldsBox" style="display:none;">
                             <label class="form-label">Destinatari A (pipe | separatore)</label>
-                            <input type="text" class="form-input" name="email_to" id="editEmailToInput">
+                            <input type="text" class="form-input" name="email_to" id="editEmailToInput" placeholder="a@x.com|b@y.com">
                             <label class="form-label mt-2">Destinatari CC (pipe | separatore)</label>
-                            <input type="text" class="form-input" name="email_cc" id="editEmailCcInput">
+                            <input type="text" class="form-input" name="email_cc" id="editEmailCcInput" placeholder="c@x.com|d@y.com">
                             <label class="form-label mt-2">Oggetto</label>
-                            <input type="text" class="form-input" name="email_subject" id="editEmailSubjectInput">
+                            <input type="text" class="form-input" name="email_subject" id="editEmailSubjectInput" placeholder="Export scheduler">
                             <label class="form-label mt-2">Corpo mail</label>
-                            <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:160px"></textarea>
+                            <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:160px" placeholder="Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"></textarea>
                             <div class="text-xs text-gray-500 mt-1">Token disponibili: {query_name}, {date}, {date-1}, {timestamp}</div>
                             <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
                         </div>
@@ -455,16 +455,6 @@ function showAddForm() {
         if (firstField) firstField.focus();
         // inizializza le query in base alla connessione selezionata
         updateQuerySelectByConnection('connectionSelect', 'querySelect');
-        // precompila campi email nel form Aggiungi se vuoti
-        try {
-            const form = document.getElementById('form-add-schedule');
-            if (form) {
-                const subj = form.querySelector('input[name="email_subject"]');
-                const body = form.querySelector('textarea[name="email_body"]');
-                if (subj && !subj.value) subj.value = 'Export scheduler';
-                if (body && !body.value) body.value = 'Buongiorno,\nin allegato estrazione relativa l\'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT';
-            }
-        } catch(_){}
     }, 50);
 }
 
@@ -515,6 +505,9 @@ function showEditForm(idx) {
         if (editEmailSubject) editEmailSubject.value = s.email_subject || '';
         const editEmailBody = document.querySelector('#edit-form textarea[name="email_body"]');
         if (editEmailBody) editEmailBody.value = s.email_body || '';
+        // Prefill defaults in Edit when empty and sharing is Email
+        const DEFAULT_SUBJECT = 'Export scheduler';
+        const DEFAULT_BODY = "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT";
         const daysSelect = document.getElementById('editDaysOfWeekSelect');
         Array.from(daysSelect.options).forEach(opt => {
             opt.selected = s.days_of_week && s.days_of_week.includes(parseInt(opt.value));
@@ -528,6 +521,10 @@ function showEditForm(idx) {
         const editEmailBox = document.getElementById('editEmailFieldsBox');
         const editOutputDirBox = document.getElementById('editOutputDirBox');
         applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
+        if (editSharingMode && editSharingMode.value === 'email') {
+            if (editEmailSubject && !editEmailSubject.value) editEmailSubject.value = DEFAULT_SUBJECT;
+            if (editEmailBody && !editEmailBody.value) editEmailBody.value = DEFAULT_BODY;
+        }
         document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
         document.getElementById('edit-form').style.display = 'block';
         document.getElementById('add-form').style.display = 'none';
@@ -621,24 +618,26 @@ function setupFormToggles() {
     sharingMode?.addEventListener('change', () => {
         if (sharingMode.value === 'email') { emailBox.style.display = 'block'; outputDirBox.style.display = 'none'; }
         else { emailBox.style.display = 'none'; outputDirBox.style.display = 'block'; }
-        // quando si passa a Email, precompila soggetto/corpo se vuoti
-        if (sharingMode.value === 'email') {
-            const form = document.getElementById('form-add-schedule');
-            if (form) {
-                const subj = form.querySelector('input[name="email_subject"]');
-                const body = form.querySelector('textarea[name="email_body"]');
-                if (subj && !subj.value) subj.value = 'Export scheduler';
-                if (body && !body.value) body.value = 'Buongiorno,\nin allegato estrazione relativa l\'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT';
-            }
-        }
     });
 
     const editSharingMode = document.getElementById('editSharingModeSelect');
     const editOutputDirBox = document.getElementById('editOutputDirBox');
     const editEmailBox = document.getElementById('editEmailFieldsBox');
     editSharingMode?.addEventListener('change', () => {
-        if (editSharingMode.value === 'email') { editEmailBox.style.display = 'block'; editOutputDirBox.style.display = 'none'; }
-        else { editEmailBox.style.display = 'none'; editOutputDirBox.style.display = 'block'; }
+        if (editSharingMode.value === 'email') {
+            editEmailBox.style.display = 'block';
+            editOutputDirBox.style.display = 'none';
+            // Prefill defaults on switch to Email if empty
+            const subjEl = document.querySelector('#edit-form input[name="email_subject"]');
+            const bodyEl = document.querySelector('#edit-form textarea[name="email_body"]');
+            const DEFAULT_SUBJECT = 'Export scheduler';
+            const DEFAULT_BODY = "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT";
+            if (subjEl && !subjEl.value) subjEl.value = DEFAULT_SUBJECT;
+            if (bodyEl && !bodyEl.value) bodyEl.value = DEFAULT_BODY;
+        } else {
+            editEmailBox.style.display = 'none';
+            editOutputDirBox.style.display = 'block';
+        }
     });
 
     // wire initial toggle state
