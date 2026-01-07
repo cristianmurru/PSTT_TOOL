@@ -262,3 +262,24 @@ N/A - Versione iniziale
 
 ### Branch
 - Lavoro svolto e integrato su `feature/R20251219`.
+
+## [2026-01-07] - Log Viewer + API logs, semplificazioni UI Scheduler (feature/R20251230)
+
+### Added
+- Nuova pagina "Log Viewer" raggiungibile da Home via link "Log": [app/frontend/logs.html](app/frontend/logs.html).
+- API Logs:
+  - `GET /api/logs/list` — elenca tutti i file in `logs/` (sia `.log` sia `.gz`, ordinati per mtime).
+  - `GET /api/logs/read-today?kind=app|errors|scheduler[&tail=N]` — lettura log odierno.
+  - `GET /api/logs/read?file=<nome>[&tail=N]` — lettura di log archiviate/compressi.
+- Router registrato in [app/main.py](app/main.py) e route HTML `/logs`.
+
+### Changed
+- `app/frontend/logs.html`: UI semplificata — rimosso i bottoni, caricamento automatico del contenuto in base al file selezionato; supporto campo Tail per mostrare solo le ultime N righe.
+- `app/frontend/scheduler_dashboard.html`: precompilazione dei default in oggetto/corpo email anche in Modifica quando si passa alla modalità Email o quando i campi sono vuoti.
+
+### Test
+- Suite completa `pytest` verde: 62 passed.
+
+### Note
+- I file di log ruotano e vengono compressi (`.gz`) con retention/rotation da configurazione; il viewer supporta lettura trasparente dei compressi.
+- Nessuna modifica obbligatoria a `connections.json` o `.env` per questa release.

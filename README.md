@@ -308,6 +308,11 @@ I log sono salvati in `logs/`:
 - `errors.log` - Solo errori
 - `scheduler.log` - Log scheduler
 
+#### Log Viewer
+- Pagina dedicata su `/logs` per la consultazione in sola lettura dei log odierni e archiviati/compressi (`.gz`).
+- Seleziona il file dal menu e, facoltativamente, imposta `Tail` per mostrare solo le ultime N righe.
+- API correlate: `GET /api/logs/list`, `GET /api/logs/read-today`, `GET /api/logs/read`.
+
 ### Livelli di Log
 
 Configura il livello nel file `.env`:
