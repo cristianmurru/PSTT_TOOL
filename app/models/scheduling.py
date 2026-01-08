@@ -112,3 +112,4 @@ class SchedulingHistoryItem(BaseModel):
     duration_sec: Optional[float] = None  # in secondi
     row_count: Optional[int] = None
     error: Optional[str] = None
+    start_date: Optional[str] = None  # data di partenza (token {date})

@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Impostazioni PSTT</title>
+    <script src="/static/css/tailwind.min.js"></script>
+    <link rel="stylesheet" href="/static/css/fontawesome.min.css">
+    <style>
+        body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica Neue, Arial; }
+        .grid { display: grid; grid-template-columns: 280px 1fr; gap: 0.75rem; align-items: center; }
+        label { font-weight: 600; }
+        input, select, textarea { width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; font-family: inherit; }
+        .section { margin-bottom: 1.5rem; }
+        .btn { background-color: #2563eb; color: #fff; font-weight: 500; padding: 0.5rem 1rem; border-radius: 0.375rem; cursor: pointer; display:inline-flex; align-items:center; }
+        .btn-secondary { background-color: #e5e7eb; color: #1f2937; }
+        .msg { margin-top: 1rem; }
+        .nav a { color: #2563eb; text-decoration: none; margin-right: 1rem; }
+        .fa-inline { font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1; }
+        .hint { color:#6b7280; font-size:0.9rem; grid-column: 2; }
+        .actions { margin-top: 0.5rem; margin-left: 280px; }
+    </style>
+</head>
+<body class="h-full">
+    <div class="min-h-full">
+        <nav class="bg-white shadow-lg border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <span class="fa-inline text-blue-600 text-2xl mr-3">&#xf013;</span>
+                        <span class="font-bold text-xl text-gray-900">Impostazioni</span>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <a href="/" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf015;</span>Home</a>
+                        <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><i class="fas fa-calendar-alt mr-1"></i>Schedulazioni</a>
+                        <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="section">
+            <h2 class="text-xl font-semibold text-gray-800 mb-3">SMTP</h2>
+            <div class="grid">
+                <label for="smtp_host">smtp_host</label>
+                <input id="smtp_host" class="border-gray-300" />
+                <label for="smtp_port">smtp_port</label>
+                <input id="smtp_port" type="number" class="border-gray-300" />
+                <label for="smtp_user">smtp_user</label>
+                <input id="smtp_user" class="border-gray-300" />
+                <label for="smtp_password">smtp_password</label>
+                <input id="smtp_password" type="password" class="border-gray-300" />
+                <label for="smtp_from">smtp_from</label>
+                <input id="smtp_from" class="border-gray-300" />
+            </div>
+                </div>
+                <div class="section">
+            <h2 class="text-xl font-semibold text-gray-800 mb-3">Report giornaliero</h2>
+            <div class="grid">
+                <label for="daily_report_enabled">DAILY_REPORT_ENABLED</label>
+                <select id="daily_report_enabled" class="border-gray-300">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                </select>
+                <label for="daily_report_cron">DAILY_REPORT_CRON</label>
+                <input id="daily_report_cron" class="border-gray-300" placeholder="es. 20 12 * * *" />
+                <label for="daily_reports_hour">DAILY_REPORTS_HOUR</label>
+                <input id="daily_reports_hour" type="number" class="border-gray-300" />
+                <span class="hint">Se <b>DAILY_REPORT_CRON</b> non è valorizzato, viene utilizzato <b>DAILY_REPORTS_HOUR</b>.</span>
+                <label for="daily_report_recipients">DAILY_REPORT_RECIPIENTS</label>
+                <input id="daily_report_recipients" class="border-gray-300" placeholder="dest1@x|dest2@y" />
+                <span class="hint">Destinatari multipli separati da pipe <b>|</b> (es. utente1@x|utente2@y).</span>
+                <label for="daily_report_cc">DAILY_REPORT_CC</label>
+                <input id="daily_report_cc" class="border-gray-300" />
+                <label for="daily_report_subject">DAILY_REPORT_SUBJECT</label>
+                <input id="daily_report_subject" class="border-gray-300" />
+                <label for="daily_report_tail_lines">DAILY_REPORT_TAIL_LINES</label>
+                <input id="daily_report_tail_lines" type="number" class="border-gray-300" />
+            </div>
+                </div>
+                <div class="actions">
+                    <button class="btn" id="saveBtn">Salva</button>
+                    <span class="msg" id="msg"></span>
+                </div>
+                <p style="margin-top:1rem;color:#6b7280;">Nota: alcune modifiche potrebbero richiedere il riavvio del servizio per essere applicate (es. scheduling).</p>
+            </div>
+        </div>
+    </div>
+    <script>
+        async function loadSettings() {
+            const res = await fetch('/api/settings/env');
+            const data = await res.json();
+            const v = data.values || {};
+            for (const k of Object.keys(v)) {
+                const el = document.getElementById(k);
+                if (el) {
+                    el.value = v[k] ?? '';
+                }
+            }
+            // default sensible subject if empty
+            const subj = document.getElementById('daily_report_subject');
+            if (subj && (!subj.value || subj.value === 'None')) {
+                subj.value = 'Report schedulazioni PSTT';
+            }
+        }
+        async function saveSettings() {
+            const payload = {};
+            for (const id of [
+                'smtp_host','smtp_port','smtp_user','smtp_password','smtp_from',
+                'daily_report_enabled','daily_report_cron','daily_reports_hour',
+                'daily_report_recipients','daily_report_cc','daily_report_subject','daily_report_tail_lines'
+            ]) {
+                const el = document.getElementById(id);
+                if (el) payload[id] = el.value;
+            }
+            const res = await fetch('/api/settings/env', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+            const out = await res.json();
+            const msgEl = document.getElementById('msg');
+            msgEl.textContent = out.success ? 'Salvato' : ('Errore: ' + (out.error || 'sconosciuto'));
+        }
+        document.getElementById('saveBtn').addEventListener('click', saveSettings);
+        loadSettings();
+    </script>
+</body>
+</html>

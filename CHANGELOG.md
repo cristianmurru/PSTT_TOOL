@@ -283,3 +283,36 @@ N/A - Versione iniziale
 ### Note
 - I file di log ruotano e vengono compressi (`.gz`) con retention/rotation da configurazione; il viewer supporta lettura trasparente dei compressi.
 - Nessuna modifica obbligatoria a `connections.json` o `.env` per questa release.
+
+## [2026-01-08] - Impostazioni UI, Report giornaliero, coerenza navbar, test non‑regressione (feature/R20260107)
+
+### Added
+- Pagina "Impostazioni" raggiungibile via navbar: [app/frontend/settings.html](app/frontend/settings.html). Consente la modifica di un sottoinsieme di chiavi `.env` (SMTP e Daily Report) tramite API.
+- API Settings:
+  - `GET /api/settings/env` — legge i valori correnti delle chiavi consentite.
+  - `POST /api/settings/env` — upsert delle chiavi consentite in `.env` (preserva struttura; richiede riavvio per riflettere schedulazioni).
+- Report giornaliero schedulazioni:
+  - Anteprima: `GET /api/reports/daily?date=YYYY-MM-DD` restituisce HTML del riepilogo.
+  - Invio manuale: `POST /api/reports/daily/send?date=YYYY-MM-DD`.
+
+### Changed
+- Settings UI: icona gear corretta (Font Awesome inline glyph), titoli di sezione (SMTP, Report giornaliero) con font più grande e maggior spazio verticale per leggibilità.
+- Navbar coerenza:
+  - `logs.html`: aggiunto link "Impostazioni" con gear.
+  - `scheduler_dashboard.html`: aggiunti link "Log" e "Impostazioni".
+- Report giornaliero HTML: aggiunta colonna "Partenza" (data token) e ampliata la colonna "Errore"; risolto bug CSS dovuto a parentesi in f-string.
+- Email subject del report giornaliero impostato al default richiesto "Report schedulazioni PSTT".
+- Scheduler history: memorizza `start_date` per ogni esecuzione.
+
+### Test
+- Ampliata la suite pytest per non‑regressione:
+  - [tests/test_frontend_pages.py](tests/test_frontend_pages.py): verifica routing e link navbar.
+  - [tests/test_frontend_strict.py](tests/test_frontend_strict.py): verifica icona gear e titoli maggiorati in Settings, link gear in Logs, nav su Dashboard.
+  - [tests/test_settings_api_basic.py](tests/test_settings_api_basic.py): roundtrip GET/POST Settings API con ripristino `.env`.
+  - [tests/test_logs_api_basic.py](tests/test_logs_api_basic.py): list e tail sui log.
+  - [tests/test_daily_report_send_mock.py](tests/test_daily_report_send_mock.py): invio report con SMTP mock (STARTTLS mantenuto).
+- Risultato: 71 passed.
+
+### Notes
+- Per applicare aggiornamenti di schedulazione alle modifiche di `.env` è richiesto il riavvio del servizio.
+- L'invio SMTP resta in modalità STARTTLS; nessuna dipendenza SSL obbligatoria.

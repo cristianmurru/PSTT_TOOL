@@ -46,21 +46,14 @@
    - Modifica il file `.env` con le credenziali database reali
    - Le variabili seguono il pattern: `DB_USER_<NOME_CONNESSIONE>` e `DB_PASS_<NOME_CONNESSIONE>`
 
-4. **Avvia l'applicazione**:
-   ```bash
-   python main.py
-   ```
-
 5. **Accedi all'interfaccia**:
    - Web UI: http://localhost:8000
    - API Docs: http://localhost:8000/api/docs
 
 ## 📁 Struttura Progetto
-
 ```
 PSTT_Tool/
 ├── app/                        # Codice applicazione
-│   ├── core/                   # Configurazioni base
 │   ├── models/                 # Modelli dati
 │   ├── services/               # Logica business
 │   ├── api/                    # Endpoints REST API
@@ -70,30 +63,25 @@ PSTT_Tool/
 ├── Export/                     # File export (esclusi da git)
 ├── logs/                       # File di log (esclusi da git)
 ├── tests/                      # Test unitari
-├── .env                        # Variabili d'ambiente (escluso da git)
 ├── connections.json            # Configurazione connessioni
 ├── requirements.txt            # Dipendenze Python
 └── main.py                     # Entry point applicazione
 ```
 
 ## 🔧 Configurazione Database
-
 ### connections.json
 
 Il file `connections.json` contiene la configurazione delle connessioni database:
-
 ```json
 {
   "default_environment": "collaudo",
   "default_connection": "A00-CDG-Collaudo",
   "environments": ["collaudo", "certificazione", "produzione"],
-  "connections": [
     {
       "name": "A00-CDG-Collaudo",
       "environment": "collaudo",
       "db_type": "oracle",
       "description": "Database Oracle Collaudo CDG",
-      "params": {
         "host": "10.183.128.21",
         "port": 1521,
         "service_name": "pdbcirccol",
@@ -104,7 +92,6 @@ Il file `connections.json` contiene la configurazione delle connessioni database
   ]
 }
 ```
-
 ### File .env
 
 Crea/modifica il file `.env` con le credenziali reali:
@@ -115,14 +102,8 @@ DB_USER_A00-CDG-Collaudo=your_oracle_user
 DB_PASS_A00-CDG-Collaudo=your_oracle_password
 
 DB_USER_A01-BOSC-Collaudo=your_oracle_user
-DB_PASS_A01-BOSC-Collaudo=your_oracle_password
-
-DB_USER_A03-TT2_UFFICIO=your_postgres_user
 DB_PASS_A03-TT2_UFFICIO=your_postgres_password
 
-# === CERTIFICAZIONE ===
-DB_USER_B00-CDG-Certificazione=your_oracle_user
-DB_PASS_B00-CDG-Certificazione=your_oracle_password
 
 # === PRODUZIONE ===
 DB_USER_C00-CDG-Produzione=your_oracle_user
@@ -140,18 +121,14 @@ Le query SQL devono essere salvate nella directory `Query/` con estensione `.sql
 I parametri possono essere definiti in due modi:
 
 1. **Define Oracle**:
-   ```sql
-   define DATAINIZIO='17/06/2022'   --Obbligatorio
    define DATAFINE='17/06/2025'     --Opzionale
    ```
 
 2. **Riferimenti parametri**:
    ```sql
    WHERE data >= TO_DATE('&DATAINIZIO', 'dd/mm/yyyy')
-   AND data < TO_DATE('&DATAFINE', 'dd/mm/yyyy')
    ```
 
-### Esempio Query
 
 ```sql
 -- Estrazione accessi operatori
@@ -252,9 +229,6 @@ Documentazione completa: http://localhost:8000/api/docs
 - Campi principali di una schedulazione:
    - `name`: nome descrittivo
    - `query`: file SQL da eseguire (da `Query/`)
-   - `connection`: nome connessione (da `connections.json`)
-   - `scheduling_mode`: `cron` | `interval` | `manual`
-   - `cron_expression`: espressione tipo crontab (5 campi)
    - `interval_seconds`: per modalità interval
    - `output_template`: template per il nome file di output
    - `enabled`: booleano per abilitare/disabilitare la schedulazione
@@ -283,18 +257,10 @@ Il modulo di metriche fornisce visibilità operativa sulle schedulazioni e aiuta
    - Distribuzione dei timeout e degli errori per query.
 
 - Endpoint e formato:
-   - `GET /api/monitoring/scheduler/status` — restituisce JSON con riepilogo corrente, conteggi e storico ridotto. Esempio semplificato:
-
-```json
-{
-   "summary": { "running": 2, "queued": 1, "success_24h": 120, "failed_24h": 3 },
    "stats": { "avg_duration_ms": 340, "p90_ms": 1200 },
    "recent_runs": [ { "query": "...", "timestamp": "...", "status": "success", "duration_ms": 200 } ]
-}
-```
 
 - Uso operativo:
-   - I dati sono pensati per essere esposti a dashboard esterne (Grafana, Prometheus exporter in futuro) o per integrazione con alerting.
    - In caso di spike di errori, il sistema registra i log completi in `logs/scheduler.log` con l'ID run per indagine.
 
 Per incrementare i dettagli delle metriche (ad es. storage storico maggiore, esportazione CSV, integrazione Prometheus) si può estendere il servizio che raccoglie gli eventi di scheduler.
@@ -308,20 +274,40 @@ I log sono salvati in `logs/`:
 - `errors.log` - Solo errori
 - `scheduler.log` - Log scheduler
 
-#### Log Viewer
 - Pagina dedicata su `/logs` per la consultazione in sola lettura dei log odierni e archiviati/compressi (`.gz`).
 - Seleziona il file dal menu e, facoltativamente, imposta `Tail` per mostrare solo le ultime N righe.
 - API correlate: `GET /api/logs/list`, `GET /api/logs/read-today`, `GET /api/logs/read`.
+
+## ⚙️ Impostazioni (.env via UI)
+
+- Pagina `/settings` per leggere e aggiornare un sottoinsieme di chiavi `.env` (SMTP e Report giornaliero). Le modifiche vengono scritte in `.env` e possono richiedere il riavvio del servizio per riflettersi nelle schedulazioni.
+- API:
+   - `GET /api/settings/env`
+   - `POST /api/settings/env`
+- Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`.
+
+## 📧 Report giornaliero schedulazioni
+
+- Descrizione: genera un riepilogo HTML delle schedulazioni eseguite nel giorno selezionato e lo invia via email.
+- Configurazione in `.env` (modificabile da `/settings`):
+   - `DAILY_REPORT_ENABLED=true|false`
+   - `DAILY_REPORT_CRON` (se vuoto, fallback su `DAILY_REPORTS_HOUR`)
+   - `DAILY_REPORTS_HOUR=6` (esempio)
+   - `DAILY_REPORT_RECIPIENTS=a@x|b@y` (pipe come separatore)
+   - `DAILY_REPORT_CC=` (opzionale)
+   - `DAILY_REPORT_SUBJECT=Report schedulazioni PSTT`
+   - `DAILY_REPORT_TAIL_LINES=50`
+- SMTP: STARTTLS (porta default 587); configurare `smtp_host`, `smtp_port`, `smtp_from`, eventuali credenziali.
+- API:
+   - `GET /api/reports/daily?date=YYYY-MM-DD` — anteprima HTML
+   - `POST /api/reports/daily/send?date=YYYY-MM-DD` — invio manuale
 
 ### Livelli di Log
 
 Configura il livello nel file `.env`:
 ```bash
-LOG_LEVEL=DEBUG  # DEBUG, INFO, WARNING, ERROR
 ```
-
 ### Modalità Debug
-
 Per abilitare il reload automatico:
 ```bash
 export DEBUG=true

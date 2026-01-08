@@ -21,6 +21,17 @@ from app.core.config import get_settings
 import smtplib
 from email.message import EmailMessage
 import traceback
+from app.services.daily_report_service import DailyReportService
+
+
+def _daily_report_job():
+    """Funzione modulare sicura per il reloader: genera e invia il report giornaliero."""
+    try:
+        svc = DailyReportService()
+        svc.generate_and_send(date.today())
+        logger.info("[DAILY_REPORT] Report giornaliero inviato")
+    except Exception as e:
+        logger.error(f"[DAILY_REPORT] Errore invio report giornaliero: {e}")
 
 
 class SchedulerService:
@@ -113,10 +124,37 @@ class SchedulerService:
                 name="Cleanup old exports",
                 misfire_grace_time=900,
             )
+            # Daily report job (configurabile via env)
+            try:
+                if getattr(self.settings, 'daily_report_enabled', False):
+                    cron = getattr(self.settings, 'daily_report_cron', None)
+                    if cron:
+                        try:
+                            dr_trigger = CronTrigger.from_crontab(cron)
+                        except Exception:
+                            logger.warning(f"[DAILY_REPORT] Cron non valido '{cron}', fallback su daily_reports_hour")
+                            dr_trigger = CronTrigger(hour=getattr(self.settings, 'daily_reports_hour', 6), minute=0)
+                    else:
+                        dr_trigger = CronTrigger(hour=getattr(self.settings, 'daily_reports_hour', 6), minute=0)
+
+                    self.scheduler.add_job(
+                        _daily_report_job,
+                        dr_trigger,
+                        name="Daily report schedulazioni",
+                        misfire_grace_time=900,
+                        coalesce=True
+                    )
+                    logger.info("[DAILY_REPORT] Job giornaliero configurato")
+            except Exception:
+                logger.exception("[DAILY_REPORT] Errore configurazione job giornaliero")
             logger.info("✅ SchedulerService avviato con job da configurazione")
         except Exception as e:
             logger.error(f"Errore nell'avvio del scheduler: {e}")
             raise
+
+        # Metodo non più utilizzato; mantenuto per retrocompatibilità (non referenziato)
+        async def _run_daily_report(self):
+            _daily_report_job()
     
     async def stop(self):
         """Ferma il servizio scheduler"""
@@ -216,7 +254,12 @@ class SchedulerService:
             logger.info(f"[SCHEDULER][{export_id}] END_QUERY duration={duration_query:.2f}s rows={getattr(result,'row_count',0)}")
             duration = (datetime.now() - start_time).total_seconds()
             status = "success" if result and getattr(result, 'success', True) else "fail"
-            # registra esecuzione parziale
+            # registra esecuzione parziale (inclusa data di partenza calcolata dai token)
+            try:
+                sched_item_for_date = SchedulingItem(**sched)
+                start_date_token = sched_item_for_date.render_string("{date}", start_time)
+            except Exception:
+                start_date_token = None
             self.execution_history.append({
                 "query": query_filename,
                 "connection": connection_name,
@@ -224,7 +267,8 @@ class SchedulerService:
                 "status": status,
                 "duration_sec": duration if status == 'success' else None,
                 "row_count": getattr(result, "row_count", 0) if result else 0,
-                "error": getattr(result, "error_message", None) if result else None
+                "error": getattr(result, "error_message", None) if result else None,
+                "start_date": start_date_token
             })
             self.save_history()
 
@@ -325,7 +369,8 @@ class SchedulerService:
                 "status": "fail",
                 "duration_sec": None,
                 "row_count": 0,
-                "error": str(e)
+                "error": str(e),
+                "start_date": None
             })
             self.save_history()
 
