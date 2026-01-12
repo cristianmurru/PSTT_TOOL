@@ -47,7 +47,9 @@
         <div class="bg-white shadow rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-lg font-semibold text-gray-900"><i class="fas fa-list mr-2"></i>Schedulazioni Attive</h2>
-                <button class="btn btn-primary" onclick="showAddForm()"><i class="fas fa-plus mr-1"></i>Aggiungi</button>
+                <div class="flex gap-2">
+                    <button class="btn btn-primary" onclick="showAddForm()"><i class="fas fa-plus mr-1"></i>Aggiungi</button>
+                </div>
             </div>
             <div id="scheduling-list">Caricamento...</div>
             <div id="add-form" style="display:none;" class="mt-6">
@@ -92,6 +94,11 @@
                             <label class="form-label">Minuto</label>
                             <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
                             <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
+                        </div>
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Secondo</label>
+                            <input type="number" class="form-input" name="second" min="0" max="59" placeholder="SS (0-59)">
+                            <div class="text-sm text-gray-400 mt-1">Facoltativo: inserisci i secondi (00-59)</div>
                         </div>
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
@@ -200,6 +207,11 @@ Report_PSTT</textarea>
                             <label class="form-label">Minuto</label>
                             <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
                             <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
+                        </div>
+                        <div class="flex-1 min-w-[120px]">
+                            <label class="form-label">Secondo</label>
+                            <input type="number" class="form-input" name="second" min="0" max="59" placeholder="SS (0-59)">
+                            <div class="text-sm text-gray-400 mt-1">Facoltativo: inserisci i secondi (00-59)</div>
                         </div>
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
@@ -444,6 +456,8 @@ function fetchScheduling() {
         });
 }
 
+// cleanup test function rimosso: la pulizia avviene automaticamente al termine dei test
+
 function showAddForm() {
     document.getElementById('add-form').style.display = 'block';
     document.getElementById('edit-form').style.display = 'none';
@@ -473,6 +487,8 @@ function showEditForm(idx) {
         document.getElementById('editConnectionSelect').value = s.connection;
         document.querySelector('#edit-form input[name="hour"]').value = s.hour;
         document.querySelector('#edit-form input[name="minute"]').value = s.minute;
+        const secEl = document.querySelector('#edit-form input[name="second"]');
+        if (secEl) secEl.value = (s.second !== undefined && s.second !== null) ? s.second : '';
         document.querySelector('#edit-form input[name="idx"]').value = idx;
         // display end_date as DD/MM/YYYY if ISO provided
         if (s.end_date) {
@@ -558,9 +574,11 @@ function toggleFieldsForMode(form, mode) {
     const daysEl = form.querySelector('[name="days_of_week"]');
     const hourEl = form.querySelector('[name="hour"]');
     const minuteEl = form.querySelector('[name="minute"]');
+    const secondEl = form.querySelector('[name="second"]');
     if (daysEl) { daysEl.disabled = isCron; const wrap = daysEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (hourEl) { hourEl.disabled = isCron; const wrap = hourEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (minuteEl) { minuteEl.disabled = isCron; const wrap = minuteEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
+    if (secondEl) { secondEl.disabled = isCron; const wrap = secondEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
 }
 
 // helper to show/hide email vs filesystem boxes based on sharing mode (available globally)
@@ -756,6 +774,7 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
         minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
+        second: mode === 'classic' ? (form.second && form.second.value ? parseInt(form.second.value) : undefined) : undefined,
         connection: form.connection.value,
         days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
         end_date: endDateIso || undefined,
@@ -794,6 +813,7 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
         minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
+        second: mode === 'classic' ? (form.second && form.second.value ? parseInt(form.second.value) : undefined) : undefined,
         connection: form.connection.value,
         days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
         end_date: endDateIso || undefined,
@@ -831,7 +851,6 @@ let _pendingDeleteIdx = null;
 function escapeHtml(unsafe) {
     return String(unsafe)
         .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
@@ -920,6 +939,22 @@ function fetchHealth() {
             html += `<div><b>CPU:</b> ${data.cpu_percent}%</div>`;
             document.getElementById('health-status').innerHTML = html;
         });
+}
+
+async function restartApp() {
+    try {
+        const res = await fetch('/api/system/restart', { method:'POST' });
+        const out = await res.json();
+        const msg = out.success ? (out.mode === 'service' ? 'Servizio in riavvio...' : 'Riavvio pianificato...') : ('Errore riavvio');
+        try {
+            const monitor = document.getElementById('monitoring-status');
+            if (monitor) {
+                monitor.innerHTML = `<div class="text-sm text-gray-600">${msg}</div>`;
+            }
+        } catch(e){}
+    } catch (e) {
+        console.error('Restart fallito', e);
+    }
 }
 
 function fetchHistory() {

@@ -22,7 +22,11 @@ class TestSettings:
         assert settings.app_name == "PSTT Tool"
         assert settings.app_version == "1.0.0"
         assert settings.host == "127.0.0.1"
-        assert settings.port == 8000
+        # La porta può essere sovrascritta dall'ambiente (es. PORT=8001 per runtime)
+        # La porta può provenire da .env o da l'ambiente di sistema
+        env_vars = get_env_vars()
+        expected_port = int(env_vars.get("PORT", 8000))
+        assert settings.port == expected_port
         assert isinstance(settings.base_dir, Path)
         assert settings.query_dir.name == "Query"
         assert settings.export_dir.name == "exports"

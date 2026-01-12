@@ -19,6 +19,15 @@
         .fa-inline { font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1; }
         .hint { color:#6b7280; font-size:0.9rem; grid-column: 2; }
         .actions { margin-top: 0.5rem; margin-left: 280px; }
+        /* Restart overlay */
+        #restartOverlay { position: fixed; inset: 0; background: rgba(17,24,39,0.6); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        #restartOverlay.show { display: flex; }
+        #restartCard { background: #fff; border-radius: 10px; padding: 18px 20px; width: 420px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        #restartTitle { font-size: 1.1rem; font-weight: 600; color: #111827; }
+        #restartDesc { font-size: 0.95rem; color: #4b5563; margin-top: 6px; }
+        .spinner { width: 18px; height: 18px; border: 3px solid #e5e7eb; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite; display:inline-block; margin-right:8px; }
+        @keyframes spin { to { transform: rotate(360deg);} }
+        #restartFooter { margin-top: 12px; display:flex; justify-content:flex-end; gap:8px; }
     </style>
 </head>
 <body class="h-full">
@@ -41,6 +50,15 @@
 
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div class="bg-white shadow rounded-lg p-6">
+                <div class="section">
+            <h2 class="text-xl font-semibold text-gray-800 mb-3">Timeout</h2>
+            <div class="grid">
+                <label for="scheduler_query_timeout_sec">scheduler_query_timeout_sec</label>
+                <input id="scheduler_query_timeout_sec" type="number" class="border-gray-300" placeholder="secondi (es. 900)" />
+                <label for="scheduler_write_timeout_sec">scheduler_write_timeout_sec</label>
+                <input id="scheduler_write_timeout_sec" type="number" class="border-gray-300" placeholder="secondi (es. 120)" />
+            </div>
+                </div>
                 <div class="section">
             <h2 class="text-xl font-semibold text-gray-800 mb-3">SMTP</h2>
             <div class="grid">
@@ -82,9 +100,21 @@
                 </div>
                 <div class="actions">
                     <button class="btn" id="saveBtn">Salva</button>
+                    <button class="btn" id="restartBtn" style="margin-left:8px;">Riavvia App</button>
                     <span class="msg" id="msg"></span>
                 </div>
-                <p style="margin-top:1rem;color:#6b7280;">Nota: alcune modifiche potrebbero richiedere il riavvio del servizio per essere applicate (es. scheduling).</p>
+                <p style="margin-top:1rem;color:#6b7280;">Nota: le modifiche sono salvate subito, ma potrebbero essere attive solo dopo il riavvio dell'applicazione.</p>
+            </div>
+        </div>
+    </div>
+    <!-- Restart status overlay -->
+    <div id="restartOverlay" aria-hidden="true">
+        <div id="restartCard">
+            <div id="restartTitle"><span class="spinner"></span><span id="restartTitleText">Riavvio in corso…</span></div>
+            <div id="restartDesc">L'applicazione si fermerà e tornerà operativa a breve.</div>
+            <div id="restartFooter">
+                <button class="btn-secondary" id="reloadBtn" style="display:none;" onclick="location.reload()">Ricarica pagina</button>
+                <button class="btn-secondary" onclick="hideRestartOverlay()">Chiudi</button>
             </div>
         </div>
     </div>
@@ -110,7 +140,8 @@
             for (const id of [
                 'smtp_host','smtp_port','smtp_user','smtp_password','smtp_from',
                 'daily_report_enabled','daily_report_cron','daily_reports_hour',
-                'daily_report_recipients','daily_report_cc','daily_report_subject','daily_report_tail_lines'
+                'daily_report_recipients','daily_report_cc','daily_report_subject','daily_report_tail_lines',
+                'scheduler_query_timeout_sec','scheduler_write_timeout_sec'
             ]) {
                 const el = document.getElementById(id);
                 if (el) payload[id] = el.value;
@@ -119,8 +150,100 @@
             const out = await res.json();
             const msgEl = document.getElementById('msg');
             msgEl.textContent = out.success ? 'Salvato' : ('Errore: ' + (out.error || 'sconosciuto'));
+            // ricarica i valori dal .env per riflettere immediatamente in UI
+            try { await loadSettings(); } catch(e){}
+        }
+        function showRestartOverlay() {
+            const ov = document.getElementById('restartOverlay');
+            ov.classList.add('show');
+            ov.setAttribute('aria-hidden','false');
+            document.getElementById('restartTitleText').textContent = 'Riavvio in corso…';
+            document.getElementById('restartDesc').textContent = "L'applicazione si fermerà e tornerà operativa a breve.";
+            document.getElementById('reloadBtn').style.display = 'none';
+        }
+        function hideRestartOverlay() {
+            const ov = document.getElementById('restartOverlay');
+            ov.classList.remove('show');
+            ov.setAttribute('aria-hidden','true');
+        }
+        async function fetchWithTimeout(resource, options = {}) {
+            const { timeout = 2500 } = options;
+            const controller = new AbortController();
+            const id = setTimeout(() => controller.abort(), timeout);
+            try {
+                const response = await fetch(resource, { ...options, signal: controller.signal });
+                return response;
+            } finally {
+                clearTimeout(id);
+            }
+        }
+        async function pollRestartStatus() {
+            // Phase 1: detect DOWN (health failing)
+            let downDetected = false;
+            const titleEl = document.getElementById('restartTitleText');
+            const descEl = document.getElementById('restartDesc');
+            const reloadBtn = document.getElementById('reloadBtn');
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+            // Try for ~20s to see the app go down
+            for (let i=0; i<10; i++) {
+                try {
+                    const res = await fetchWithTimeout('/health', { timeout: 1500 });
+                    if (!res.ok) throw new Error('not-ok');
+                    await sleep(1500);
+                } catch (e) {
+                    downDetected = true;
+                    break;
+                }
+            }
+            if (downDetected) {
+                titleEl.textContent = 'Applicazione in riavvio…';
+                descEl.textContent = 'Attendere: il servizio sta ripartendo.';
+            }
+            // Phase 2: detect UP (health available again)
+            for (let j=0; j<40; j++) { // up to ~60s
+                try {
+                    const res = await fetchWithTimeout('/health', { timeout: 2000 });
+                    if (res.ok) {
+                        titleEl.textContent = 'Riavvio completato';
+                        descEl.textContent = 'Il servizio è tornato operativo.';
+                        reloadBtn.style.display = 'inline-flex';
+                        // auto reload after short delay
+                        setTimeout(() => { try { location.reload(); } catch (e) {} }, 3000);
+                        return;
+                    }
+                } catch (e) {
+                    // still down
+                }
+                await sleep(1500);
+            }
+            // Fallback: still not up, keep overlay informative
+            titleEl.textContent = 'Riavvio in corso…';
+            descEl.textContent = 'Se persiste, prova a ricaricare la pagina.';
+            reloadBtn.style.display = 'inline-flex';
+        }
+        async function restartApp() {
+            const msgEl = document.getElementById('msg');
+            msgEl.textContent = 'Riavvio in corso...';
+            showRestartOverlay();
+            try {
+                const res = await fetch('/api/system/restart', { method:'POST' });
+                const out = await res.json();
+                if (out.success) {
+                    msgEl.textContent = out.mode === 'service' ? 'Servizio in riavvio...' : 'Riavvio pianificato...';
+                    // Start health polling to inform user about down/up phases
+                    pollRestartStatus();
+                } else {
+                    msgEl.textContent = 'Errore riavvio: ' + (out.error || 'sconosciuto');
+                    document.getElementById('restartDesc').textContent = 'Errore durante la richiesta di riavvio.';
+                }
+            } catch (e) {
+                msgEl.textContent = 'Errore riavvio';
+                document.getElementById('restartDesc').textContent = 'Errore durante la richiesta di riavvio.';
+            }
         }
         document.getElementById('saveBtn').addEventListener('click', saveSettings);
+        document.getElementById('restartBtn').addEventListener('click', restartApp);
         loadSettings();
     </script>
 </body>

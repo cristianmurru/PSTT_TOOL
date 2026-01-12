@@ -316,3 +316,26 @@ N/A - Versione iniziale
 ### Notes
 - Per applicare aggiornamenti di schedulazione alle modifiche di `.env` è richiesto il riavvio del servizio.
 - L'invio SMTP resta in modalità STARTTLS; nessuna dipendenza SSL obbligatoria.
+
+## [2026-01-12] - Secondi nello scheduling, UX di riavvio, persistenza `.env`, pulizia test automatica (feature/R20260109)
+
+### Added
+- Scheduling `classic`: supporto opzionale del campo `second` (SS, 0‑59). Modello `SchedulingItem` aggiornato e UI Add/Edit con input dedicato.
+- Endpoint di sistema: `POST /api/system/restart` per riavviare l'applicazione.
+- Settings UI: pulsante “Riavvia App” con overlay informativo e polling di salute durante down/up.
+- Timeout configurabili da UI: `scheduler_query_timeout_sec` e `scheduler_write_timeout_sec` gestiti dalle API e persistiti in `.env`.
+
+### Changed
+- API Settings (`/api/settings/env`): writer `.env` ristrutturato per generare il file secondo il template atteso, preservando le chiavi sconosciute e includendo i nuovi timeout.
+- Frontend Scheduler: i campi `hour/minute/second` si abilitano/disabilitano coerentemente con `scheduling_mode` (classic/cron). Rimosso il pulsante “pulisci test” dalla dashboard.
+- Test unitari: la porta attesa dall’app viene letta dinamicamente da `get_env_vars()`; niente assunzioni hard‑coded.
+
+### Fixed
+- Evitata regressione su `.env`: i nuovi campi non vengono più azzerati al salvataggio; la UI ricarica i valori subito dopo il POST.
+- Pulizia artefatti di test: endpoint `/api/scheduler/cleanup-test` e hook `pytest_sessionfinish` che esegue la pulizia automatica a fine suite.
+
+### Test
+- Suite completa `pytest`: 71 passed, 0 failed.
+
+### Notes
+- In ambiente produzione/collaudo, il riavvio avviene come servizio NSSM se presente; in modalità terminale viene pianificato via `start_pstt.bat` e il processo corrente termina, con overlay che comunica lo stato all’utente.
