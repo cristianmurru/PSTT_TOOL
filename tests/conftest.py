@@ -87,3 +87,13 @@ def pytest_sessionfinish(session, exitstatus):
         f.write(f'- Falliti: {fail_count}\n')
         f.write(f'- Errori: {error_count}\n')
         f.write(f'\n**Exit status:** {exitstatus}\n')
+    # Esegui pulizia automatica delle schedulazioni e dello storico di test
+    try:
+        client = TestClient(app)
+        client.post('/api/scheduler/cleanup-test', json={
+            'pattern': '^(test_|.*test_.*|test_query\\.sql)$',
+            'dry_run': False
+        })
+    except Exception as e:
+        # Non bloccare l'esecuzione in caso di problemi nella pulizia
+        print(f"[pytest_sessionfinish] Cleanup test failure: {e}")

@@ -25,6 +25,7 @@ class SchedulingItem(BaseModel):
     days_of_week: Optional[List[int]] = Field(None, description="Giorni della settimana (0=Mon .. 6=Sun)")
     hour: Optional[int] = Field(None, description="Ora di esecuzione (0-23)")
     minute: Optional[int] = Field(None, description="Minuto di esecuzione (0-59)")
+    second: Optional[int] = Field(None, description="Secondo di esecuzione (0-59)")
     # Cron expression (se scheduling_mode == 'cron')
     cron_expression: Optional[str] = Field(None, description="Espressione cron in formato standard (5 campi)")
 

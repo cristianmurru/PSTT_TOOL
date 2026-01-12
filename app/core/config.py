@@ -132,8 +132,22 @@ class Settings(BaseSettings):
     # Scheduler settings
     scheduler_timezone: str = "Europe/Rome"
     daily_reports_hour: int = 6  # Ora di esecuzione report giornalieri
+    # Daily report configurazione (recap giornaliero schedulazioni)
+    daily_report_enabled: bool = False
+    daily_report_cron: str | None = None  # es. "0 19 * * *"; se assente usa daily_reports_hour
+    daily_report_recipients: str | None = None  # pipe-separated (a@x.com|b@y.com)
+    daily_report_cc: str | None = None  # pipe-separated
+    daily_report_subject: str = "Report schedulazioni PSTT"
+    daily_report_tail_lines: int = 50
+
+    # SMTP settings (per invio email)
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
     # Timeout esecuzione query schedulatore (secondi)
-    scheduler_query_timeout_sec: int = 600  # default 10 minuti
+    scheduler_query_timeout_sec: int = 900  # default 15 minuti
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"
@@ -169,6 +183,7 @@ def get_settings() -> Settings:
                     item.setdefault('days_of_week', s.get('days_of_week'))
                     item.setdefault('hour', s.get('hour'))
                     item.setdefault('minute', s.get('minute'))
+                    item.setdefault('second', s.get('second'))
                     item.setdefault('end_date', s.get('end_date'))
                     item.setdefault('output_filename_template', s.get('output_filename_template', '{query_name}_{date}.xlsx'))
                     item.setdefault('output_date_format', s.get('output_date_format', '%Y-%m-%d'))
@@ -177,7 +192,15 @@ def get_settings() -> Settings:
                     item.setdefault('sharing_mode', s.get('sharing_mode', 'filesystem'))
                     # default export dir from settings
                     item.setdefault('output_dir', s.get('output_dir', str(_settings.export_dir)))
-                    item.setdefault('email_recipients', s.get('email_recipients'))
+                    # Email new fields with backward compatibility
+                    # Prefer explicit email_to; if missing, fall back to legacy email_recipients
+                    legacy_recipients = s.get('email_recipients')
+                    item.setdefault('email_to', s.get('email_to', legacy_recipients))
+                    item.setdefault('email_cc', s.get('email_cc'))
+                    item.setdefault('email_subject', s.get('email_subject'))
+                    item.setdefault('email_body', s.get('email_body'))
+                    # keep legacy field to avoid breaking existing configs
+                    item.setdefault('email_recipients', legacy_recipients)
                     # append normalized
                     normalized.append(item)
 

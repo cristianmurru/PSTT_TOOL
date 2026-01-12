@@ -218,6 +218,8 @@ def reload_scheduler_jobs(request: Request):
                     trigger_args['hour'] = sched.get('hour')
                 if sched.get('minute') is not None:
                     trigger_args['minute'] = sched.get('minute')
+                if sched.get('second') is not None:
+                    trigger_args['second'] = sched.get('second')
                 days = sched.get('days_of_week')
                 if days:
                     trigger_args['day_of_week'] = ','.join(str(d) for d in days)
@@ -297,3 +299,68 @@ async def add_scheduling(request: Request, payload: Dict[str, Any] = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Errore salvataggio schedulazione: {e}")
     # legacy trailing code removed after refactor
+
+
+@router.post("/cleanup-test", summary="Rimuove schedulazioni e storico di test")
+async def cleanup_test(request: Request, payload: Dict[str, Any] | None = Body(None)):
+    """Rimuove schedulazioni di test (es. query che iniziano con 'test_' o 'test_query.sql') e ripulisce lo storico.
+    Parametri opzionali nel payload:
+      - pattern: regex per identificare le query da rimuovere (default: ^(test_|.*test_.*|test_query\.sql)$)
+      - dry_run: se True, mostra cosa verrebbe rimosso senza applicare
+    """
+    settings = get_settings()
+    sched = getattr(settings, 'scheduling', [])
+    pattern = r"^(test_|.*test_.*|test_query\.sql)$"
+    dry_run = False
+    if isinstance(payload, dict):
+        if 'pattern' in payload and payload['pattern']:
+            pattern = str(payload['pattern'])
+        dry_run = bool(payload.get('dry_run', False))
+    try:
+        to_remove_idx = []
+        for i, s in enumerate(sched):
+            q = s.get('query', '') or ''
+            if re.match(pattern, q, flags=re.IGNORECASE):
+                to_remove_idx.append(i)
+        removed = [sched[i] for i in to_remove_idx]
+        if not dry_run and to_remove_idx:
+            # crea nuovo elenco senza gli elementi rimossi
+            new_sched = [s for i, s in enumerate(sched) if i not in to_remove_idx]
+            # persisti su connections.json
+            cf = settings.connections_file
+            with open(cf, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            data['scheduling'] = new_sched
+            with open(cf, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, default=str)
+            # aggiorna in-memory
+            settings.scheduling = new_sched
+            # ricarica i job
+            try:
+                reload_scheduler_jobs(request)
+            except Exception:
+                logger.warning('reload_scheduler_jobs non eseguito durante cleanup-test')
+            # ripulisci storico
+            export_dir = Path(get_settings().export_dir)
+            history_path = export_dir / "scheduler_history.json"
+            try:
+                if history_path.exists():
+                    with open(history_path, 'r', encoding='utf-8') as f:
+                        history = json.load(f)
+                    filtered = []
+                    for h in history:
+                        q = h.get('query', '') or ''
+                        if not re.match(pattern, q, flags=re.IGNORECASE):
+                            filtered.append(h)
+                    with open(history_path, 'w', encoding='utf-8') as f:
+                        json.dump(filtered, f, indent=2)
+            except Exception as e:
+                logger.warning(f"Ripulitura storico fallita: {e}")
+        return {
+            'pattern': pattern,
+            'dry_run': dry_run,
+            'removed_count': len(removed),
+            'removed': removed if dry_run else None
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Errore cleanup test: {e}")

@@ -14,7 +14,7 @@ import mimetypes
 from app.core.config import setup_logging, get_settings, get_connections_config
 from app.services.connection_service import ConnectionService
 from app.services.scheduler_service import SchedulerService
-from app.api import connections, queries, scheduler as scheduler_api, monitoring, logs as logs_api, reports as reports_api, settings as settings_api
+from app.api import connections, queries, scheduler as scheduler_api, monitoring, logs as logs_api, reports as reports_api, settings as settings_api, system as system_api
 from app.api.queries import setup_error_handlers
 
 
@@ -90,6 +90,7 @@ app.include_router(monitoring.router, prefix="/api/monitoring", tags=["monitorin
 app.include_router(logs_api.router, prefix="/api/logs", tags=["logs"])
 app.include_router(reports_api.router, prefix="/api/reports", tags=["reports"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
+app.include_router(system_api.router, prefix="/api/system", tags=["system"])
 setup_error_handlers(app)
 
 

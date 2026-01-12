@@ -203,7 +203,8 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
 
 - Engine e comportamento:
    - APScheduler gestisce trigger di tipo `cron` e `interval`.
-   - Il backend normalizza le cron expression a 5 campi (minuto, ora, giorno, mese, giorno-settimana). Se viene fornita una cron a 6 campi (con seconds) la prima parte (seconds) viene rimossa e la normalizzazione viene riportata nella risposta API (`cron_normalized`).
+   - Modalità `classic`: oltre a `hour` e `minute`, è disponibile il campo opzionale `second` (0‑59) per granularità al secondo.
+   - Modalità `cron`: il backend normalizza le cron expression a 5 campi (minuto, ora, giorno, mese, giorno‑settimana). Se incolli una cron a 6 campi (con secondi) la prima parte viene rimossa e la normalizzazione è riportata in risposta API (`cron_normalized`).
    - Le schedulazioni sono eseguite in parallelo quando possibile; i job possono essere configurati con retry/timeout e con livello di concorrenza.
 
 Consiglio operativo: quando inserisci una cron, verifica sempre che abbia 5 campi e usa https://crontab.guru per validarla rapidamente.
@@ -284,7 +285,8 @@ I log sono salvati in `logs/`:
 - API:
    - `GET /api/settings/env`
    - `POST /api/settings/env`
-- Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`.
+ - Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`.
+ - Riavvio dall’UI: pulsante “Riavvia App” con overlay che mostra la fase di riavvio (down/up) tramite polling su `/health`. Backend: `POST /api/system/restart` (riavvio come servizio se disponibile, altrimenti pianificazione rilancio via `start_pstt.bat`).
 
 ## 📧 Report giornaliero schedulazioni
 
