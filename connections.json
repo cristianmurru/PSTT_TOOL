@@ -148,7 +148,8 @@
         6
       ],
       "hour": 8,
-      "minute": 0,
+      "minute": 32,
+      "second": null,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -161,8 +162,7 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null,
-      "second": null
+      "email_body": null
     },
     {
       "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
@@ -171,10 +171,17 @@
       "description": null,
       "scheduling_mode": "classic",
       "days_of_week": [
-        1
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
       ],
       "hour": 8,
-      "minute": 52,
+      "minute": 33,
+      "second": null,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date}.xlsx",
@@ -184,7 +191,6 @@
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
       "email_recipients": null,
-      "second": null,
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
@@ -229,24 +235,30 @@
       "description": null,
       "scheduling_mode": "classic",
       "days_of_week": [
-        0
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
       ],
-      "hour": 14,
-      "minute": 1,
+      "hour": 8,
+      "minute": 34,
+      "second": null,
       "cron_expression": null,
-      "end_date": "2025-12-31",
+      "end_date": "2026-01-14",
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
       "output_include_timestamp": false,
-      "sharing_mode": "email",
+      "sharing_mode": "filesystem",
       "output_dir": null,
       "email_recipients": null,
       "email_to": "cristian.murru@posteitaliane.it",
       "email_cc": null,
       "email_subject": "test test",
-      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
-      "second": null
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
     },
     {
       "query": "CDG-NXV-005--Dispacci-Gabbie.sql",

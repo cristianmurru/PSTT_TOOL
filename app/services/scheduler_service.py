@@ -24,6 +24,18 @@ import traceback
 from app.services.daily_report_service import DailyReportService
 
 
+def _to_int(val, default: int) -> int:
+    try:
+        if val is None:
+            return default
+        return int(val)
+    except Exception:
+        try:
+            return int(float(val))
+        except Exception:
+            return default
+
+
 def _daily_report_job():
     """Funzione modulare sicura per il reloader: genera e invia il report giornaliero."""
     try:
@@ -51,22 +63,46 @@ class SchedulerService:
     def load_history(self):
         history_path = self.export_dir / "scheduler_history.json"
         if history_path.exists():
-            with open(history_path, "r", encoding="utf-8") as f:
-                all_history = json.load(f)
-            # Mantieni tutto lo storico in memoria; il filtro dei 30 giorni verrà applicato in API/UI
-            # per evitare perdite di eventi al riavvio.
             try:
-                self.execution_history = list(all_history)
-            except Exception:
-                # fallback in caso di formato inatteso
+                # Gestisci file vuoto o corrotto con backup automatico
+                text = history_path.read_text(encoding="utf-8")
+                if not text.strip():
+                    self.execution_history = []
+                    return
+                all_history = json.loads(text)
+                # Mantieni tutto lo storico in memoria; il filtro dei 30 giorni verrà applicato in API/UI
+                # per evitare perdite di eventi al riavvio.
+                try:
+                    self.execution_history = list(all_history)
+                except Exception:
+                    self.execution_history = []
+            except Exception as e:
+                # Backup del file corrotto e riparti da history vuota
+                try:
+                    import shutil
+                    ts = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+                    backup = self.export_dir / f"scheduler_history_corrupt_{ts}.json"
+                    shutil.copy(str(history_path), str(backup))
+                    logger.warning(f"[SCHEDULER] scheduler_history.json corrotto: backup in {backup} ({e})")
+                except Exception:
+                    logger.warning(f"[SCHEDULER] scheduler_history.json corrotto e non backupabile: {e}")
                 self.execution_history = []
         else:
             self.execution_history = []
 
     def save_history(self):
         history_path = self.export_dir / "scheduler_history.json"
-        with open(history_path, "w", encoding="utf-8") as f:
-            json.dump(self.execution_history, f, indent=2)
+        try:
+            tmp_dir = self.export_dir / "_tmp"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_file = tmp_dir / "scheduler_history.json.tmp"
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(self.execution_history, f, indent=2)
+            # Move atomico
+            import shutil
+            shutil.move(str(tmp_file), str(history_path))
+        except Exception as e:
+            logger.warning(f"[SCHEDULER] Impossibile salvare history: {e}")
 
     async def start(self):
         """Avvia il servizio scheduler"""
@@ -244,7 +280,13 @@ class SchedulerService:
             req_obj = QueryExecutionRequest(**request)
 
             # Timeout configurabile (default 300s) per la fase query
-            query_timeout = getattr(self.settings, 'scheduler_query_timeout_sec', 300)
+            query_timeout = _to_int(getattr(self.settings, 'scheduler_query_timeout_sec', 300), 300)
+            try:
+                query_timeout = float(query_timeout)
+            except Exception:
+                query_timeout = 300.0
+            if query_timeout <= 0:
+                query_timeout = 300.0
             logger.info(f"[SCHEDULER][{export_id}] START_QUERY timeout={query_timeout}s")
             loop = asyncio.get_event_loop()
             try:
@@ -309,7 +351,13 @@ class SchedulerService:
             tmp_file = tmp_dir / f"{filename}.tmp.xlsx"
             write_start = datetime.now()
             logger.info(f"[SCHEDULER][{export_id}] START_WRITE temp={tmp_file}")
-            write_timeout = getattr(self.settings, 'scheduler_write_timeout_sec', 120)
+            write_timeout = _to_int(getattr(self.settings, 'scheduler_write_timeout_sec', 120), 120)
+            try:
+                write_timeout = float(write_timeout)
+            except Exception:
+                write_timeout = 120.0
+            if write_timeout <= 0:
+                write_timeout = 120.0
             try:
                 # Usa keyword index=False per chiarezza
                 await asyncio.wait_for(loop.run_in_executor(None, lambda: df.to_excel(tmp_file, index=False)), timeout=write_timeout)
@@ -364,9 +412,12 @@ class SchedulerService:
 
         except Exception as e:
             logger.error(f"[SCHEDULER] Errore durante export {args}: {e}\n{traceback.format_exc()}")
+            # Usa i nomi già risolti se disponibili
+            qn = locals().get('query_filename', 'unknown')
+            cn = locals().get('connection_name', 'unknown')
             self.execution_history.append({
-                "query": args[0] if args else 'unknown',
-                "connection": args[1] if len(args) > 1 else 'unknown',
+                "query": qn,
+                "connection": cn,
                 "timestamp": datetime.now().isoformat(),
                 "status": "fail",
                 "duration_sec": None,

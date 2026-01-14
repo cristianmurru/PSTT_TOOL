@@ -339,3 +339,21 @@ N/A - Versione iniziale
 
 ### Notes
 - In ambiente produzione/collaudo, il riavvio avviene come servizio NSSM se presente; in modalità terminale viene pianificato via `start_pstt.bat` e il processo corrente termina, con overlay che comunica lo stato all’utente.
+
+## [2026-01-14] - Fix salvataggio impostazioni, robustezza scheduler, aggiornamenti minori (feature/R20260113)
+
+### Fixed
+- API Settings (`POST /api/settings/env`): corretta la risposta che causava HTTP 500 (NameError). Ora il POST restituisce i valori aggiornati riletti da `.env` e preserva rigorosamente le credenziali DB e le chiavi non whitelestate.
+- Scheduler: coercizione sicura dei timeout `scheduler_query_timeout_sec` e `scheduler_write_timeout_sec` a numeri positivi (float), eliminando errori `"<=" not supported between instances of 'str' and 'int'`.
+- Storico scheduler: caricamento tollerante a file vuoti/corrotti con backup automatico (`exports/scheduler_history_corrupt_<timestamp>.json`) e salvataggio atomico tramite file temporaneo in `exports/_tmp`.
+- History errori: registrazione corretta di `query` e `connection` negli eventi di errore.
+
+### Changed
+- Settings UI: messaggi di errore più chiari in caso di failure del salvataggio (HTTP status o dettaglio JSON), con ricarica dei valori subito dopo il POST.
+- `connections.json`: aggiornati alcuni orari/minuti/secondi e la `end_date` di job di esempio per allineamento test (BOSC‑NXV‑001, TT2_UFFICIO‑PCL‑001, CDG‑INF‑002).
+
+### Test
+- Suite completa `pytest`: 71 passed, 0 failed. Verbale in [tests/verbale_test_20260114_090518.md](tests/verbale_test_20260114_090518.md).
+
+### Notes
+- Le modifiche alle impostazioni `.env` lato UI sono whitelestate: solo le chiavi SMTP, Daily Report e i timeout vengono aggiornate in‑place; le credenziali e le altre chiavi restano intatte. Per riflettere i nuovi timeout sui job già caricati può essere necessario un riavvio dell'applicazione/servizio.
