@@ -199,6 +199,22 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
    - `CDG-NXV--006--Mazzetti creati.sql`
    - `CDG-NXV--008--Esiti.sql`
 
+## ⚙️ Impostazioni (.env) da UI e sicurezza
+
+- La pagina [app/frontend/settings.html](app/frontend/settings.html) consente di modificare un sottoinsieme whitelestato di chiavi `.env` (SMTP, Daily Report, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`).
+- Le credenziali database (`DB_USER_*`, `DB_PASS_*`) e le altre chiavi non whitelestate non vengono mai toccate dalle API.
+- Endpoint:
+   - `GET /api/settings/env` — legge i valori correnti.
+   - `POST /api/settings/env` — aggiorna in‑place solo le chiavi consentite e restituisce i valori aggiornati riletti.
+- Nota: per applicare i nuovi timeout ai job già caricati potrebbe essere necessario un riavvio dell'applicazione.
+
+## 🔁 Riavvio servizio
+
+- Endpoint: `POST /api/system/restart`.
+- Comportamento:
+   - Se l'app è installata come servizio Windows (NSSM), viene richiesto il riavvio del servizio.
+   - In modalità terminale, viene avviato `start_pstt.bat` e il processo corrente termina; la UI mostra un overlay informativo fino al ripristino della salute.
+
 - Output: i file vengono salvati in `Export/` con formato e nome generati dalla logica di rendering: `{query_name}_{YYYY-MM-DD}_{timestamp}.{ext}`. È possibile personalizzare il template di output nella schedulazione (es. includere nome connessione, filtri, ecc.).
 
 - Engine e comportamento:

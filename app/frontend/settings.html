@@ -146,10 +146,21 @@
                 const el = document.getElementById(id);
                 if (el) payload[id] = el.value;
             }
-            const res = await fetch('/api/settings/env', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
-            const out = await res.json();
             const msgEl = document.getElementById('msg');
-            msgEl.textContent = out.success ? 'Salvato' : ('Errore: ' + (out.error || 'sconosciuto'));
+            try {
+                const res = await fetch('/api/settings/env', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+                let out;
+                try { out = await res.json(); } catch(_) { out = null; }
+                if (res.ok && out && out.success) {
+                    msgEl.textContent = 'Salvato';
+                } else if (out && out.error) {
+                    msgEl.textContent = 'Errore: ' + out.error;
+                } else {
+                    msgEl.textContent = 'Errore: HTTP ' + res.status;
+                }
+            } catch (e) {
+                msgEl.textContent = 'Errore: ' + (e && e.message ? e.message : 'sconosciuto');
+            }
             // ricarica i valori dal .env per riflettere immediatamente in UI
             try { await loadSettings(); } catch(e){}
         }
