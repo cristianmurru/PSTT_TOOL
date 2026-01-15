@@ -218,8 +218,7 @@ def reload_scheduler_jobs(request: Request):
                     trigger_args['hour'] = sched.get('hour')
                 if sched.get('minute') is not None:
                     trigger_args['minute'] = sched.get('minute')
-                if sched.get('second') is not None:
-                    trigger_args['second'] = sched.get('second')
+                # il campo 'second' non è supportato in configurazione dashboard; ignora eventuali valori
                 days = sched.get('days_of_week')
                 if days:
                     trigger_args['day_of_week'] = ','.join(str(d) for d in days)

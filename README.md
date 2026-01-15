@@ -212,14 +212,17 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
 
 - Endpoint: `POST /api/system/restart`.
 - Comportamento:
-   - Se l'app è installata come servizio Windows (NSSM), viene richiesto il riavvio del servizio.
-   - In modalità terminale, viene avviato `start_pstt.bat` e il processo corrente termina; la UI mostra un overlay informativo fino al ripristino della salute.
+   - Se l'app è installata come servizio Windows, viene richiesto il riavvio usando comandi nativi (`Stop-Service`/`Start-Service`)
+   - **Nota**: Non richiede NSSM nel PATH - funziona con qualsiasi servizio Windows
+   - In modalità terminale, viene avviato `start_pstt.bat` e il processo corrente termina
+   - La UI mostra un overlay informativo con monitoraggio stato (down/up) tramite polling su `/health`
+- Script diagnostico: `tools/diagnose_restart.ps1` per troubleshooting problemi restart
 
 - Output: i file vengono salvati in `Export/` con formato e nome generati dalla logica di rendering: `{query_name}_{YYYY-MM-DD}_{timestamp}.{ext}`. È possibile personalizzare il template di output nella schedulazione (es. includere nome connessione, filtri, ecc.).
 
 - Engine e comportamento:
    - APScheduler gestisce trigger di tipo `cron` e `interval`.
-   - Modalità `classic`: oltre a `hour` e `minute`, è disponibile il campo opzionale `second` (0‑59) per granularità al secondo.
+   - Modalità `classic`: si configurano solo `hour` e `minute` (nessun campo `second`).
    - Modalità `cron`: il backend normalizza le cron expression a 5 campi (minuto, ora, giorno, mese, giorno‑settimana). Se incolli una cron a 6 campi (con secondi) la prima parte viene rimossa e la normalizzazione è riportata in risposta API (`cron_normalized`).
    - Le schedulazioni sono eseguite in parallelo quando possibile; i job possono essere configurati con retry/timeout e con livello di concorrenza.
 

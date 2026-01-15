@@ -95,11 +95,7 @@
                             <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
                             <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
                         </div>
-                        <div class="flex-1 min-w-[120px]">
-                            <label class="form-label">Secondo</label>
-                            <input type="number" class="form-input" name="second" min="0" max="59" placeholder="SS (0-59)">
-                            <div class="text-sm text-gray-400 mt-1">Facoltativo: inserisci i secondi (00-59)</div>
-                        </div>
+                        
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
                             <select class="form-input" name="days_of_week" id="daysOfWeekSelect" multiple style="height:160px;">
@@ -208,11 +204,7 @@ Report_PSTT</textarea>
                             <input type="number" class="form-input" name="minute" min="0" max="59" placeholder="MM (0-59)" required>
                             <div class="text-sm text-gray-400 mt-1">Inserisci i minuti (00-59)</div>
                         </div>
-                        <div class="flex-1 min-w-[120px]">
-                            <label class="form-label">Secondo</label>
-                            <input type="number" class="form-input" name="second" min="0" max="59" placeholder="SS (0-59)">
-                            <div class="text-sm text-gray-400 mt-1">Facoltativo: inserisci i secondi (00-59)</div>
-                        </div>
+                        
                         <div class="flex-1 min-w-[180px] self-start">
                             <label class="form-label">Giorni della settimana</label>
                             <select class="form-input" name="days_of_week" id="editDaysOfWeekSelect" multiple style="height:160px;">
@@ -487,8 +479,7 @@ function showEditForm(idx) {
         document.getElementById('editConnectionSelect').value = s.connection;
         document.querySelector('#edit-form input[name="hour"]').value = s.hour;
         document.querySelector('#edit-form input[name="minute"]').value = s.minute;
-        const secEl = document.querySelector('#edit-form input[name="second"]');
-        if (secEl) secEl.value = (s.second !== undefined && s.second !== null) ? s.second : '';
+        
         document.querySelector('#edit-form input[name="idx"]').value = idx;
         // display end_date as DD/MM/YYYY if ISO provided
         if (s.end_date) {
@@ -574,11 +565,10 @@ function toggleFieldsForMode(form, mode) {
     const daysEl = form.querySelector('[name="days_of_week"]');
     const hourEl = form.querySelector('[name="hour"]');
     const minuteEl = form.querySelector('[name="minute"]');
-    const secondEl = form.querySelector('[name="second"]');
+    const secondEl = null;
     if (daysEl) { daysEl.disabled = isCron; const wrap = daysEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (hourEl) { hourEl.disabled = isCron; const wrap = hourEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
     if (minuteEl) { minuteEl.disabled = isCron; const wrap = minuteEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
-    if (secondEl) { secondEl.disabled = isCron; const wrap = secondEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
 }
 
 // helper to show/hide email vs filesystem boxes based on sharing mode (available globally)
@@ -774,7 +764,7 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
         minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
-        second: mode === 'classic' ? (form.second && form.second.value ? parseInt(form.second.value) : undefined) : undefined,
+        
         connection: form.connection.value,
         days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
         end_date: endDateIso || undefined,
@@ -813,7 +803,7 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
         minute: mode === 'classic' ? (form.minute.value ? parseInt(form.minute.value) : undefined) : undefined,
-        second: mode === 'classic' ? (form.second && form.second.value ? parseInt(form.second.value) : undefined) : undefined,
+        
         connection: form.connection.value,
         days_of_week: mode === 'classic' ? (days.length ? days : undefined) : undefined,
         end_date: endDateIso || undefined,

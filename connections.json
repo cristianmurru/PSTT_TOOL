@@ -101,7 +101,7 @@
   ],
   "scheduling": [
     {
-      "query": "CDG-NXV-006--Mazzetti creati.sql",
+      "query": "CDG-NXV-005--Dispacci-Gabbie.sql",
       "connection": "C00-CDG-Produzione",
       "enabled": true,
       "description": null,
@@ -115,8 +115,9 @@
         5,
         6
       ],
-      "hour": 11,
-      "minute": 13,
+      "hour": 10,
+      "minute": 51,
+      "second": null,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date-1}.xlsx",
@@ -129,8 +130,7 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null,
-      "second": null
+      "email_body": null
     },
     {
       "query": "BOSC-NXV-001--Accessi operatori.sql",
@@ -212,7 +212,8 @@
         6
       ],
       "hour": 11,
-      "minute": 7,
+      "minute": 10,
+      "second": null,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{date-1}.xlsx",
@@ -225,8 +226,7 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null,
-      "second": null
+      "email_body": null
     },
     {
       "query": "CDG-INF-002--Visualizza Legenda DelReason.sql",
@@ -261,16 +261,23 @@
       "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
     },
     {
-      "query": "CDG-NXV-005--Dispacci-Gabbie.sql",
+      "query": "CDG-NXV-006--Mazzetti creati.sql",
       "connection": "C00-CDG-Produzione",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
       "days_of_week": [
-        4
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
       ],
       "hour": 11,
-      "minute": 15,
+      "minute": 5,
+      "second": null,
       "cron_expression": null,
       "end_date": null,
       "output_filename_template": "{query_name}_{{date-1}.xlsx",
@@ -283,8 +290,7 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
-      "second": null
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
     }
   ]
 }
