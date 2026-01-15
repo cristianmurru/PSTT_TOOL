@@ -5,6 +5,38 @@ Tutte le modifiche importanti a questo progetto saranno documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-01-15
+
+### Fixed
+- 🔧 **CRITICAL: Service Restart Failure** - Risolto problema restart da UI in ambienti dove NSSM non è nel PATH
+  - Rimossa dipendenza da NSSM per restart: usa solo comandi Windows nativi (`Stop-Service`/`Start-Service`)
+  - Script PowerShell inline con retry logic (5 tentativi) per gestire avvii falliti
+  - Esecuzione in background con `CREATE_NO_WINDOW` per evitare finestre popup
+  - Eliminata chiamata `_exit_process()` in modalità service per prevenire loop infiniti
+- 🔧 **NSSM Configuration** - Aggiornata configurazione service in `install_service.ps1`
+  - Cambiato `AppExit Default Restart` → `AppExit Default Exit`
+  - Restart automatico solo su crash reali (exit code != 0), non su terminazione normale
+  - Previene loop di restart quando applicazione termina volontariamente
+
+### Changed
+- ♻️ **Service Restart Logic** - Semplificata implementazione in `app/api/system.py`
+  - Da 80+ righe con multiple strategie fallback a 50 righe con logica diretta
+  - Migliore logging per troubleshooting: traccia ogni tentativo di restart
+  - Compatibilità garantita con installazioni dove NSSM non è configurato nel PATH di sistema
+
+### Added
+- ✨ **Diagnostic Tool** - Nuovo script `tools/diagnose_restart.ps1`
+  - Verifica completa configurazione (servizio, NSSM, PATH, .env, porte in ascolto)
+  - Identifica problemi critici e warning con raccomandazioni automatiche
+  - Utile per troubleshooting restart failures in produzione/collaudo
+- ✅ **Test Suite Expansion** - Aggiunti 14 test per restart service (`tests/test_system_restart.py`)
+  - Test detection service vs terminal mode
+  - Verifica anti-loop: `_exit_process()` non chiamato in service mode
+  - Test end-to-end per entrambi i flussi (service/terminal)
+  - Test regressione per verificare risoluzione bug loop restart
+  - Verifica configurazione NSSM corretta in install_service.ps1
+  - Suite test totale: 71 → 85 test
+
 ## [1.0.0] - 2025-08-12
 
 ### Aggiunto
@@ -357,3 +389,13 @@ N/A - Versione iniziale
 
 ### Notes
 - Le modifiche alle impostazioni `.env` lato UI sono whitelestate: solo le chiavi SMTP, Daily Report e i timeout vengono aggiornate in‑place; le credenziali e le altre chiavi restano intatte. Per riflettere i nuovi timeout sui job già caricati può essere necessario un riavvio dell'applicazione/servizio.
+
+## [2026-01-14] - Rimozione campo "second" dalla configurazione schedulazioni (feature/R20260114)
+
+### Changed
+- Dashboard Scheduler: rimosso il campo "Secondo" da Add/Edit. Le schedulazioni in modalità classic ora prevedono solo `hour` e `minute`.
+- Backend: il valore `second` (se presente in elementi legacy di `connections.json`) viene ignorato nella creazione dei trigger APScheduler.
+- Documentazione: aggiornato README per chiarire che i secondi non sono configurabili da dashboard.
+
+### Notes
+- Il report giornaliero continua a mostrare l'orario di partenza con precisione al secondo, ma la configurazione dei secondi non è prevista.

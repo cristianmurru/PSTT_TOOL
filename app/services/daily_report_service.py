@@ -58,12 +58,24 @@ class DailyReportService:
 
         html_rows = []
         for h in items:
+            # Partenza: preferisci timestamp ISO completo; fallback al token start_date
+            partenza = ''
+            try:
+                ts_raw = h.get('timestamp')
+                if ts_raw:
+                    ts_dt = datetime.fromisoformat(ts_raw)
+                    partenza = ts_dt.strftime('%Y-%m-%d %H:%M:%S')
+            except Exception:
+                partenza = ''
+            if not partenza:
+                partenza = h.get('start_date') or ''
+
             html_rows.append(
                 f"""
                 <tr>
                     <td>{esc(h.get('query'))}</td>
                     <td>{esc(h.get('connection'))}</td>
-                    <td>{esc(h.get('start_date') or '')}</td>
+                    <td>{esc(partenza)}</td>
                     <td>{esc(h.get('status'))}</td>
                     <td style='text-align:right'>{(h.get('duration_sec') or 0):.2f}</td>
                     <td style='text-align:right'>{int(h.get('row_count') or 0)}</td>
@@ -72,14 +84,15 @@ class DailyReportService:
                 """
             )
 
+        # HTML email ben formato (head + style una sola volta; nessun testo spurio)
         html = f"""
+        <html>
+        <head>
+            <meta charset='utf-8'>
             <style>
                 body {{ font-family: system-ui, Arial, sans-serif; }}
                 table {{ width: 100%; border-collapse: collapse; table-layout: auto; }}
                 th, td {{ border: 1px solid #ddd; padding: 8px; vertical-align: top; }}
-                th {{ background: #f3f4f6; text-align: left; }}
-            </style>
-                th, td {{ border: 1px solid #ddd; padding: 8px; }}
                 th {{ background: #f3f4f6; text-align: left; }}
             </style>
         </head>
