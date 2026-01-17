@@ -211,11 +211,13 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
 ## 🔁 Riavvio servizio
 
 - Endpoint: `POST /api/system/restart`.
-- Comportamento:
-   - Se l'app è installata come servizio Windows, viene richiesto il riavvio usando comandi nativi (`Stop-Service`/`Start-Service`)
-   - **Nota**: Non richiede NSSM nel PATH - funziona con qualsiasi servizio Windows
-   - In modalità terminale, viene avviato `start_pstt.bat` e il processo corrente termina
+- Comportamento multi-strategia con fallback automatico:
+   - **Strategia 1 (preferita)**: Comandi Windows nativi (`Stop-Service`/`Start-Service`) - non richiede NSSM nel PATH
+   - **Strategia 2 (fallback)**: `nssm restart` se disponibile - quando comandi nativi falliscono per permessi/policy
+   - **Strategia 3 (ultimo resort)**: `nssm stop` + wait + `nssm start` - massimo controllo sulla sequenza
+   - In modalità terminale: viene avviato `start_pstt.bat` e il processo corrente termina
    - La UI mostra un overlay informativo con monitoraggio stato (down/up) tramite polling su `/health`
+- **Robustezza**: Il sistema prova automaticamente strategie alternative in caso di fallimento (utile in ambienti enterprise con policy restrittive)
 - Script diagnostico: `tools/diagnose_restart.ps1` per troubleshooting problemi restart
 
 - Output: i file vengono salvati in `Export/` con formato e nome generati dalla logica di rendering: `{query_name}_{YYYY-MM-DD}_{timestamp}.{ext}`. È possibile personalizzare il template di output nella schedulazione (es. includere nome connessione, filtri, ecc.).

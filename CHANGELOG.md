@@ -5,37 +5,24 @@ Tutte le modifiche importanti a questo progetto saranno documentate in questo fi
 Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.3] - 2026-01-15
+## [1.0.4] - 2026-01-17
 
 ### Fixed
-- 🔧 **CRITICAL: Service Restart Failure** - Risolto problema restart da UI in ambienti dove NSSM non è nel PATH
-  - Rimossa dipendenza da NSSM per restart: usa solo comandi Windows nativi (`Stop-Service`/`Start-Service`)
-  - Script PowerShell inline con retry logic (5 tentativi) per gestire avvii falliti
-  - Esecuzione in background con `CREATE_NO_WINDOW` per evitare finestre popup
-  - Eliminata chiamata `_exit_process()` in modalità service per prevenire loop infiniti
-- 🔧 **NSSM Configuration** - Aggiornata configurazione service in `install_service.ps1`
-  - Cambiato `AppExit Default Restart` → `AppExit Default Exit`
-  - Restart automatico solo su crash reali (exit code != 0), non su terminazione normale
-  - Previene loop di restart quando applicazione termina volontariamente
-
-### Changed
-- ♻️ **Service Restart Logic** - Semplificata implementazione in `app/api/system.py`
-  - Da 80+ righe con multiple strategie fallback a 50 righe con logica diretta
-  - Migliore logging per troubleshooting: traccia ogni tentativo di restart
-  - Compatibilità garantita con installazioni dove NSSM non è configurato nel PATH di sistema
+- 🔧 **Service Restart Reliability in Production** - Implementata strategia multi-fallback per restart servizio
+  - Strategia 1 (preferita): Comandi Windows nativi (`Stop-Service`/`Start-Service`) - funziona senza NSSM nel PATH
+  - Strategia 2 (fallback): `nssm restart` se disponibile - gestione automatica da NSSM
+  - Strategia 3 (ultimo resort): `nssm stop` + wait + `nssm start` - massimo controllo sulla sequenza
+  - Risolve problemi di permessi/policy in ambienti enterprise dove comandi nativi possono fallire
 
 ### Added
-- ✨ **Diagnostic Tool** - Nuovo script `tools/diagnose_restart.ps1`
-  - Verifica completa configurazione (servizio, NSSM, PATH, .env, porte in ascolto)
-  - Identifica problemi critici e warning con raccomandazioni automatiche
-  - Utile per troubleshooting restart failures in produzione/collaudo
-- ✅ **Test Suite Expansion** - Aggiunti 14 test per restart service (`tests/test_system_restart.py`)
-  - Test detection service vs terminal mode
-  - Verifica anti-loop: `_exit_process()` non chiamato in service mode
-  - Test end-to-end per entrambi i flussi (service/terminal)
-  - Test regressione per verificare risoluzione bug loop restart
-  - Verifica configurazione NSSM corretta in install_service.ps1
-  - Suite test totale: 71 → 85 test
+- ✨ **NSSM Availability Check** - Nuova funzione `_check_nssm_available()` per verificare presenza NSSM prima di usarlo
+- 📊 **Enhanced Restart Logging** - Log dettagliati per ogni strategia tentata (successo/fallimento) per diagnostica
+
+### Changed
+- ♻️ **Restart Logic Resilience** - Logica restart più robusta con fallback progressivi
+  - Non più dipendente da singola strategia che può fallire
+  - Adattamento automatico all'ambiente (permessi, NSSM disponibilità, policy aziendali)
+  - Migliore gestione errori con logging specifico per troubleshooting
 
 ## [1.0.0] - 2025-08-12
 
@@ -399,3 +386,36 @@ N/A - Versione iniziale
 
 ### Notes
 - Il report giornaliero continua a mostrare l'orario di partenza con precisione al secondo, ma la configurazione dei secondi non è prevista.
+
+
+## [1.0.3] - 2026-01-15
+
+### Fixed
+- 🔧 **CRITICAL: Service Restart Failure** - Risolto problema restart da UI in ambienti dove NSSM non è nel PATH
+  - Rimossa dipendenza da NSSM per restart: usa solo comandi Windows nativi (`Stop-Service`/`Start-Service`)
+  - Script PowerShell inline con retry logic (5 tentativi) per gestire avvii falliti
+  - Esecuzione in background con `CREATE_NO_WINDOW` per evitare finestre popup
+  - Eliminata chiamata `_exit_process()` in modalità service per prevenire loop infiniti
+- 🔧 **NSSM Configuration** - Aggiornata configurazione service in `install_service.ps1`
+  - Cambiato `AppExit Default Restart` → `AppExit Default Exit`
+  - Restart automatico solo su crash reali (exit code != 0), non su terminazione normale
+  - Previene loop di restart quando applicazione termina volontariamente
+
+### Changed
+- ♻️ **Service Restart Logic** - Semplificata implementazione in `app/api/system.py`
+  - Da 80+ righe con multiple strategie fallback a 50 righe con logica diretta
+  - Migliore logging per troubleshooting: traccia ogni tentativo di restart
+  - Compatibilità garantita con installazioni dove NSSM non è configurato nel PATH di sistema
+
+### Added
+- ✨ **Diagnostic Tool** - Nuovo script `tools/diagnose_restart.ps1`
+  - Verifica completa configurazione (servizio, NSSM, PATH, .env, porte in ascolto)
+  - Identifica problemi critici e warning con raccomandazioni automatiche
+  - Utile per troubleshooting restart failures in produzione/collaudo
+- ✅ **Test Suite Expansion** - Aggiunti 14 test per restart service (`tests/test_system_restart.py`)
+  - Test detection service vs terminal mode
+  - Verifica anti-loop: `_exit_process()` non chiamato in service mode
+  - Test end-to-end per entrambi i flussi (service/terminal)
+  - Test regressione per verificare risoluzione bug loop restart
+  - Verifica configurazione NSSM corretta in install_service.ps1
+  - Suite test totale: 71 → 85 test
