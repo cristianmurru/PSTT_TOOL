@@ -54,7 +54,27 @@ def _get_service_status(name: str) -> dict:
         return {"exists": False}
 
 
+def _check_nssm_available() -> bool:
+    """Check if NSSM is available in PATH or current directory."""
+    try:
+        result = subprocess.run(
+            ["nssm", "version"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
+
+
 def _restart_as_service() -> bool:
+    """
+    Multi-strategy restart with fallback mechanisms:
+    1. Try Windows native commands (Stop-Service + Start-Service)
+    2. If fails and NSSM available, try: nssm restart
+    3. If still fails, try: nssm stop + wait + nssm start
+    """
     try:
         name = _resolve_service_name()
         # Check if service exists
@@ -68,13 +88,20 @@ def _restart_as_service() -> bool:
         
         logger.info(f"Restarting service: {name}")
         
-        # Use Windows native commands (no NSSM dependency)
-        # This works even if NSSM is not in PATH
+        # Strategy 1: Windows native commands (preferred - works without NSSM in PATH)
+        logger.info("Strategy 1: Trying Windows native Stop-Service/Start-Service")
         ps_script = f"""
             $serviceName = '{name}'
             
             # Stop service
-            Stop-Service -Name $serviceName -Force -ErrorAction SilentlyContinue
+            try {{
+                Stop-Service -Name $serviceName -Force -ErrorAction Stop
+                Write-Host "Service stopped successfully"
+            }} catch {{
+                Write-Error "Stop failed: $_"
+                exit 1
+            }}
+            
             Start-Sleep -Seconds 3
             
             # Start service with retry
@@ -86,7 +113,9 @@ def _restart_as_service() -> bool:
                     exit 0
                 }} catch {{
                     Write-Warning "Start attempt $($i+1) failed: $_"
-                    Start-Sleep -Seconds 2
+                    if ($i -lt ($maxRetries - 1)) {{
+                        Start-Sleep -Seconds 2
+                    }}
                 }}
             }}
             Write-Error "Failed to start service after $maxRetries attempts"
@@ -99,12 +128,44 @@ def _restart_as_service() -> bool:
             "-Command", ps_script
         ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
         
-        logger.info(f"Service restart command sent for {name}")
+        logger.info(f"Service restart command sent (native Windows commands) for {name}")
         return True
         
-    except Exception:
-        logger.exception("Restart service failed")
-        return False
+    except Exception as e:
+        logger.warning(f"Strategy 1 failed: {e}")
+        
+        # Strategy 2: NSSM restart (if available)
+        if _check_nssm_available():
+            try:
+                logger.info("Strategy 2: Trying NSSM restart command")
+                subprocess.Popen([
+                    "nssm", "restart", name
+                ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                logger.info(f"Service restart via NSSM sent for {name}")
+                return True
+            except Exception as e2:
+                logger.warning(f"Strategy 2 failed: {e2}")
+                
+                # Strategy 3: NSSM stop + start (last resort)
+                try:
+                    logger.info("Strategy 3: Trying NSSM stop + start sequence")
+                    ps_nssm = f"""
+                        nssm stop {name}
+                        Start-Sleep -Seconds 3
+                        nssm start {name}
+                    """
+                    subprocess.Popen([
+                        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                        "-Command", ps_nssm
+                    ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    logger.info(f"Service restart via NSSM stop/start sent for {name}")
+                    return True
+                except Exception as e3:
+                    logger.error(f"All restart strategies failed: {e3}")
+                    return False
+        else:
+            logger.error("NSSM not available for fallback, restart failed")
+            return False
 
 
 def _schedule_terminal_restart(delay_sec: int = 2):
