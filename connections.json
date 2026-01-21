@@ -101,8 +101,8 @@
   ],
   "scheduling": [
     {
-      "query": "CDG-NXV-005--Dispacci-Gabbie.sql",
-      "connection": "C00-CDG-Produzione",
+      "query": "CDG-INF-001--Visualizza Legenda Eventi-Tracce.sql",
+      "connection": "A00-CDG-Collaudo",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -115,8 +115,8 @@
         5,
         6
       ],
-      "hour": 7,
-      "minute": 37,
+      "hour": 10,
+      "minute": 50,
       "second": null,
       "cron_expression": null,
       "end_date": null,
@@ -130,7 +130,12 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null
+      "email_body": null,
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     },
     {
       "query": "BOSC-NXV-001--Accessi operatori.sql",
@@ -147,8 +152,8 @@
         5,
         6
       ],
-      "hour": 8,
-      "minute": 32,
+      "hour": 17,
+      "minute": 51,
       "second": null,
       "cron_expression": null,
       "end_date": null,
@@ -156,17 +161,22 @@
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
       "output_include_timestamp": false,
-      "sharing_mode": "filesystem",
+      "sharing_mode": "email",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
       "email_recipients": null,
-      "email_to": null,
-      "email_cc": null,
-      "email_subject": null,
-      "email_body": null
+      "email_to": "cristian.murru@posteitaliane.it",
+      "email_cc": "cristian.murru@posteitaliane.it",
+      "email_subject": "cristian.murru@posteitaliane.it",
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     },
     {
       "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
-      "connection": "C01-TT2_UFFICIO",
+      "connection": "A03-TT2_UFFICIO",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -194,11 +204,16 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null
+      "email_body": null,
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     },
     {
       "query": "CDG-NXV--008--Esiti.sql",
-      "connection": "C00-CDG-Produzione",
+      "connection": "A00-CDG-Collaudo",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -226,7 +241,12 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": null
+      "email_body": null,
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     },
     {
       "query": "CDG-INF-002--Visualizza Legenda DelReason.sql",
@@ -243,11 +263,11 @@
         5,
         6
       ],
-      "hour": 8,
-      "minute": 34,
+      "hour": 17,
+      "minute": 52,
       "second": null,
       "cron_expression": null,
-      "end_date": "2026-01-14",
+      "end_date": "2026-01-19",
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
@@ -258,11 +278,16 @@
       "email_to": "cristian.murru@posteitaliane.it",
       "email_cc": null,
       "email_subject": "test test",
-      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     },
     {
-      "query": "CDG-NXV-006--Mazzetti creati.sql",
-      "connection": "C00-CDG-Produzione",
+      "query": "BOSC-INF--001--Prodotti.sql",
+      "connection": "A01-BOSC-Collaudo",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -290,7 +315,12 @@
       "email_to": null,
       "email_cc": null,
       "email_subject": null,
-      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
+      "kafka_topic": null,
+      "kafka_key_field": null,
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": null
     }
   ]
 }

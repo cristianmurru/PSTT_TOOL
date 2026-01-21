@@ -14,7 +14,7 @@ import mimetypes
 from app.core.config import setup_logging, get_settings, get_connections_config
 from app.services.connection_service import ConnectionService
 from app.services.scheduler_service import SchedulerService
-from app.api import connections, queries, scheduler as scheduler_api, monitoring, logs as logs_api, reports as reports_api, settings as settings_api, system as system_api
+from app.api import connections, queries, scheduler as scheduler_api, monitoring, logs as logs_api, reports as reports_api, settings as settings_api, system as system_api, kafka as kafka_api
 from app.api.queries import setup_error_handlers
 
 
@@ -91,6 +91,7 @@ app.include_router(logs_api.router, prefix="/api/logs", tags=["logs"])
 app.include_router(reports_api.router, prefix="/api/reports", tags=["reports"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["settings"])
 app.include_router(system_api.router, prefix="/api/system", tags=["system"])
+app.include_router(kafka_api.router, prefix="/api/kafka", tags=["kafka"])
 setup_error_handlers(app)
 
 
@@ -114,6 +115,23 @@ async def home(request: Request):
         
     except Exception as e:
         logger.error(f"Errore nella homepage: {e}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+
+@app.get("/kafka", name="kafka_dashboard")
+async def kafka_dashboard(request: Request):
+    """Kafka Dashboard UI"""
+    try:
+        context = {
+            "request": request,
+            "app_name": settings.app_name,
+            "app_version": settings.app_version
+        }
+        
+        return templates.TemplateResponse("kafka_dashboard.html", context)
+        
+    except Exception as e:
+        logger.error(f"Errore nel Kafka dashboard: {e}")
         raise HTTPException(status_code=500, detail="Errore interno del server")
 
 
