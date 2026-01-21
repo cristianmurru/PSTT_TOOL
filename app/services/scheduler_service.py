@@ -3,7 +3,7 @@ Servizio per il sistema di scheduling (stub per ora)
 """
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Tuple
 from loguru import logger
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -13,8 +13,10 @@ from app.core.config import get_settings
 from pathlib import Path
 from app.models.queries import QueryExecutionRequest
 import json
-from app.models.scheduling import SchedulingItem, SchedulingHistoryItem
+from app.models.scheduling import SchedulingItem, SchedulingHistoryItem, SharingMode
 from datetime import datetime, timedelta, date
+from app.services.kafka_service import KafkaService
+from app.models.kafka import KafkaConnectionConfig, KafkaProducerConfig
 def _today():
     return date.today()
 from app.core.config import get_settings
@@ -303,6 +305,11 @@ class SchedulerService:
                 start_date_token = sched_item_for_date.render_string("{date}", start_time)
             except Exception:
                 start_date_token = None
+            
+            # Determina export_mode
+            sharing = sched.get('sharing_mode', 'filesystem')
+            export_mode = 'kafka' if sharing == 'kafka' else ('email' if sharing == 'email' else 'filesystem')
+            
             self.execution_history.append({
                 "query": query_filename,
                 "connection": connection_name,
@@ -311,7 +318,8 @@ class SchedulerService:
                 "duration_sec": duration if status == 'success' else None,
                 "row_count": getattr(result, "row_count", 0) if result else 0,
                 "error": getattr(result, "error_message", None) if result else None,
-                "start_date": start_date_token
+                "start_date": start_date_token,
+                "export_mode": export_mode
             })
             self.save_history()
 
@@ -409,6 +417,25 @@ class SchedulerService:
                 except Exception:
                     logger.exception("Invio email fallito, file salvato su filesystem")
 
+            elif sharing == 'kafka':
+                # Export verso Kafka topic
+                try:
+                    await self._execute_kafka_export(
+                        export_id=export_id,
+                        sched=sched,
+                        result_data=result.data,
+                        query_filename=query_filename,
+                        connection_name=connection_name,
+                        start_time=start_time
+                    )
+                except Exception as kafka_err:
+                    logger.exception(f"[SCHEDULER][{export_id}] Export Kafka fallito: {kafka_err}")
+                    # Aggiorna history con errore Kafka
+                    if self.execution_history and self.execution_history[-1].get('query') == query_filename:
+                        self.execution_history[-1]['error'] = f"Kafka export failed: {str(kafka_err)}"
+                        self.execution_history[-1]['status'] = 'fail'
+                        self.save_history()
+
         except Exception as e:
             logger.error(f"[SCHEDULER] Errore durante export {args}: {e}\n{traceback.format_exc()}")
             # Usa i nomi già risolti se disponibili
@@ -422,9 +449,165 @@ class SchedulerService:
                 "duration_sec": None,
                 "row_count": 0,
                 "error": str(e),
-                "start_date": None
+                "start_date": None,
+                "export_mode": "unknown"
             })
             self.save_history()
+
+    async def _execute_kafka_export(
+        self,
+        export_id: str,
+        sched: dict,
+        result_data: list,
+        query_filename: str,
+        connection_name: str,
+        start_time: datetime
+    ):
+        """
+        Esegue export dei risultati query verso Kafka topic
+        
+        Args:
+            export_id: ID univoco export per logging
+            sched: Dizionario configurazione scheduling
+            result_data: Dati risultato query (lista di dict)
+            query_filename: Nome file query
+            connection_name: Nome connessione DB
+            start_time: Timestamp inizio esecuzione
+        """
+        kafka_start = datetime.now()
+        
+        # Leggi configurazione Kafka da scheduling
+        kafka_topic = sched.get('kafka_topic')
+        kafka_key_field = sched.get('kafka_key_field', 'id')
+        kafka_batch_size = sched.get('kafka_batch_size', 100)
+        kafka_include_metadata = sched.get('kafka_include_metadata', True)
+        kafka_connection_name = sched.get('kafka_connection', 'default')
+        
+        if not kafka_topic:
+            raise ValueError("kafka_topic non specificato in configurazione scheduling")
+        
+        logger.info(
+            f"[SCHEDULER][{export_id}] KAFKA_EXPORT_START "
+            f"topic={kafka_topic} rows={len(result_data)} batch_size={kafka_batch_size}"
+        )
+        
+        # Carica configurazione Kafka da connections.json
+        connections_path = Path("connections.json")
+        if not connections_path.exists():
+            raise FileNotFoundError("connections.json non trovato")
+        
+        with open(connections_path, 'r', encoding='utf-8') as f:
+            connections_data = json.load(f)
+        
+        kafka_connections = connections_data.get('kafka_connections', {})
+        if kafka_connection_name not in kafka_connections:
+            raise ValueError(
+                f"Connessione Kafka '{kafka_connection_name}' non trovata in connections.json"
+            )
+        
+        kafka_conn_config_dict = kafka_connections[kafka_connection_name]
+        
+        # Crea oggetti configurazione Kafka
+        conn_config = KafkaConnectionConfig(**kafka_conn_config_dict)
+        producer_config = KafkaProducerConfig()  # usa defaults ottimizzati
+        
+        # Prepara messaggi da inviare
+        messages: List[Tuple[str, dict]] = []
+        
+        for row in result_data:
+            # Estrai message key dal campo specificato
+            if kafka_key_field not in row:
+                logger.warning(
+                    f"[SCHEDULER][{export_id}] Campo key '{kafka_key_field}' non presente in riga, "
+                    f"uso UUID random"
+                )
+                import uuid
+                message_key = str(uuid.uuid4())
+            else:
+                message_key = str(row[kafka_key_field])
+            
+            # Prepara value messaggio
+            message_value = dict(row)  # copia riga
+            
+            # Aggiungi metadata se richiesto
+            if kafka_include_metadata:
+                message_value['_metadata'] = {
+                    'source_query': query_filename,
+                    'source_connection': connection_name,
+                    'export_timestamp': start_time.isoformat(),
+                    'export_id': export_id
+                }
+            
+            messages.append((message_key, message_value))
+        
+        # Invia batch a Kafka
+        async with KafkaService(conn_config, producer_config) as kafka:
+            # Usa send_batch_with_retry per robustezza
+            result = await kafka.send_batch_with_retry(
+                topic=kafka_topic,
+                messages=messages,
+                batch_size=kafka_batch_size,
+                max_retries=3,
+                retry_backoff_ms=100
+            )
+        
+        kafka_duration = (datetime.now() - kafka_start).total_seconds()
+        
+        # Log risultato
+        success_rate = result.get_success_rate()
+        logger.info(
+            f"[SCHEDULER][{export_id}] KAFKA_EXPORT_END "
+            f"sent={result.succeeded}/{result.total} "
+            f"success_rate={success_rate:.1f}% "
+            f"duration={kafka_duration:.2f}s "
+            f"throughput={result.succeeded/kafka_duration if kafka_duration > 0 else 0:.1f} msg/sec"
+        )
+        
+        # Persisti metriche Kafka (best effort)
+        try:
+            from app.services.kafka_metrics_service import get_kafka_metrics_service
+            metrics_service = get_kafka_metrics_service()
+            
+            # Stima bytes inviati (approssimazione)
+            avg_message_size = 500  # Stima conservativa, potrebbe essere calcolato meglio
+            total_bytes = result.succeeded * avg_message_size
+            
+            metrics_service.record_metric(
+                topic=kafka_topic,
+                messages_sent=result.succeeded,
+                messages_failed=result.failed,
+                bytes_sent=total_bytes,
+                latency_ms=(kafka_duration * 1000) / result.total if result.total > 0 else 0,
+                operation_type="scheduler",
+                source=query_filename,
+                error_message=result.errors[0] if result.errors else None
+            )
+        except Exception as me:
+            logger.debug(f"[SCHEDULER][{export_id}] Errore registrazione metrica Kafka: {me}")
+        
+        # Aggiorna history con dati Kafka
+        if self.execution_history and self.execution_history[-1].get('query') == query_filename:
+            self.execution_history[-1].update({
+                'kafka_topic': kafka_topic,
+                'kafka_messages_sent': result.succeeded,
+                'kafka_messages_failed': result.failed,
+                'kafka_duration_sec': kafka_duration,
+                'export_mode': 'kafka'
+            })
+            # Se fallimenti parziali, aggiungi warning
+            if result.failed > 0:
+                self.execution_history[-1]['error'] = (
+                    f"Kafka partial failure: {result.failed}/{result.total} messaggi falliti. "
+                    f"Errori: {', '.join(result.errors[:3])}"
+                )
+            self.save_history()
+        
+        # Se troppi fallimenti, solleva eccezione
+        if success_rate < 95.0:
+            raise Exception(
+                f"Kafka export failed: solo {result.succeeded}/{result.total} messaggi inviati "
+                f"({success_rate:.1f}% success rate)"
+            )
 
     def _append_metrics(self, export_id: str, query: str, connection: str, duration_query: float, duration_write: float, duration_total: float, rows: int):
         try:

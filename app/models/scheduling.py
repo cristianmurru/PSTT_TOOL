@@ -11,6 +11,7 @@ import re
 class SharingMode(str, Enum):
     FILESYSTEM = "filesystem"
     EMAIL = "email"
+    KAFKA = "kafka"
 
 
 class SchedulingItem(BaseModel):
@@ -47,6 +48,13 @@ class SchedulingItem(BaseModel):
     email_cc: Optional[str] = Field(None, description="Destinatari CC, separati da pipe |")
     email_subject: Optional[str] = Field(None, description="Oggetto email personalizzabile")
     email_body: Optional[str] = Field(None, description="Corpo email plain text")
+
+    # Kafka export fields
+    kafka_topic: Optional[str] = Field(None, description="Topic Kafka di destinazione (se sharing_mode=kafka)")
+    kafka_key_field: Optional[str] = Field(None, description="Campo risultato da usare come message key")
+    kafka_batch_size: Optional[int] = Field(100, ge=1, le=10000, description="Dimensione batch Kafka")
+    kafka_include_metadata: Optional[bool] = Field(True, description="Includi metadata nel messaggio Kafka")
+    kafka_connection: Optional[str] = Field(None, description="Nome connessione Kafka da connections.json")
 
     def _build_token_replacements(self, exec_dt: Optional[datetime] = None) -> dict:
         """Costruisce dizionario di sostituzione token comuni.
@@ -114,3 +122,9 @@ class SchedulingHistoryItem(BaseModel):
     row_count: Optional[int] = None
     error: Optional[str] = None
     start_date: Optional[str] = None  # data di partenza (token {date})
+    # Kafka export tracking
+    kafka_topic: Optional[str] = None  # Topic Kafka (se export Kafka)
+    kafka_messages_sent: Optional[int] = None  # Messaggi inviati con successo
+    kafka_messages_failed: Optional[int] = None  # Messaggi falliti
+    kafka_duration_sec: Optional[float] = None  # Durata invio batch Kafka
+    export_mode: Optional[str] = None  # filesystem, email, kafka

@@ -81,12 +81,22 @@ class DatabaseConfig(BaseModel):
         return f"mssql+pyodbc://{username}:{password}@{host}:{port}/{database}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
 
 
+class KafkaConnectionConfig(BaseModel):
+    """Configurazione per una connessione Kafka (in connections.json)"""
+    name: str
+    bootstrap_servers: str
+    security_protocol: str = "PLAINTEXT"
+    sasl_mechanism: Optional[str] = None
+    default_topic: str = "pstt-data"
+
+
 class ConnectionsConfig(BaseModel):
     """Configurazione completa delle connessioni"""
     default_environment: str
     default_connection: str
     environments: List[str]
     connections: List[DatabaseConfig]
+    kafka_connections: Optional[Dict[str, KafkaConnectionConfig]] = None
     
     def get_connection_by_name(self, name: str) -> Optional[DatabaseConfig]:
         """Trova una connessione per nome"""
@@ -138,6 +148,36 @@ class Settings(BaseSettings):
     daily_report_recipients: str | None = None  # pipe-separated (a@x.com|b@y.com)
     daily_report_cc: str | None = None  # pipe-separated
     daily_report_subject: str = "Report schedulazioni PSTT"
+    
+    # Kafka settings
+    kafka_enabled: bool = False
+    kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_security_protocol: str = "PLAINTEXT"
+    kafka_sasl_mechanism: Optional[str] = None
+    kafka_sasl_username: Optional[str] = None
+    kafka_sasl_password: Optional[str] = None
+    kafka_ssl_cafile: Optional[str] = None
+    kafka_ssl_certfile: Optional[str] = None
+    kafka_ssl_keyfile: Optional[str] = None
+    
+    # Kafka Producer settings
+    kafka_compression_type: str = "snappy"
+    kafka_batch_size: int = 16384
+    kafka_linger_ms: int = 10
+    kafka_max_request_size: int = 1048576
+    kafka_request_timeout_ms: int = 30000
+    kafka_enable_idempotence: bool = True
+    kafka_retry_backoff_ms: int = 100
+    kafka_max_in_flight_requests: int = 5
+    kafka_acks: str = "all"
+    
+    # Kafka Application settings
+    kafka_default_topic: str = "pstt-data"
+    kafka_message_batch_size: int = 100
+    kafka_max_retries: int = 3
+    kafka_health_check_interval_sec: int = 60
+    kafka_log_level: str = "INFO"
+    kafka_log_payload: bool = False
     daily_report_tail_lines: int = 50
 
     # SMTP settings (per invio email)
@@ -227,6 +267,10 @@ def get_connections_config() -> ConnectionsConfig:
             _connections_config = ConnectionsConfig(**data)
             logger.info(f"Configurazioni connessioni caricate: {len(_connections_config.connections)} connessioni")
             
+            # Log Kafka connections se presenti
+            if _connections_config.kafka_connections:
+                logger.info(f"Configurazioni Kafka caricate: {len(_connections_config.kafka_connections)} connessioni")
+            
         except FileNotFoundError:
             logger.error(f"File connections.json non trovato: {settings.connections_file}")
             raise
@@ -238,6 +282,60 @@ def get_connections_config() -> ConnectionsConfig:
             raise
             
     return _connections_config
+
+
+def get_kafka_config() -> Optional[Dict[str, Any]]:
+    """
+    Ottiene la configurazione Kafka combinando settings e connections.json
+    
+    Returns:
+        Dict con configurazione Kafka completa o None se Kafka non abilitato
+    """
+    try:
+        settings = get_settings()
+        
+        if not settings.kafka_enabled:
+            return None
+        
+        from app.models.kafka import KafkaConnectionConfig, KafkaProducerConfig
+        
+        # Configurazione connessione
+        connection_config = KafkaConnectionConfig(
+            bootstrap_servers=settings.kafka_bootstrap_servers,
+            security_protocol=settings.kafka_security_protocol,
+            sasl_mechanism=settings.kafka_sasl_mechanism,
+            sasl_username=settings.kafka_sasl_username,
+            sasl_password=settings.kafka_sasl_password,
+            ssl_cafile=settings.kafka_ssl_cafile,
+            ssl_certfile=settings.kafka_ssl_certfile,
+            ssl_keyfile=settings.kafka_ssl_keyfile
+        )
+        
+        # Configurazione producer
+        producer_config = KafkaProducerConfig(
+            compression_type=settings.kafka_compression_type,
+            batch_size=settings.kafka_batch_size,
+            linger_ms=settings.kafka_linger_ms,
+            max_request_size=settings.kafka_max_request_size,
+            request_timeout_ms=settings.kafka_request_timeout_ms,
+            enable_idempotence=settings.kafka_enable_idempotence,
+            retry_backoff_ms=settings.kafka_retry_backoff_ms,
+            max_in_flight_requests=settings.kafka_max_in_flight_requests,
+            acks=settings.kafka_acks
+        )
+        
+        return {
+            "connection": connection_config,
+            "producer": producer_config,
+            "default_topic": settings.kafka_default_topic,
+            "message_batch_size": settings.kafka_message_batch_size,
+            "max_retries": settings.kafka_max_retries,
+            "log_payload": settings.kafka_log_payload
+        }
+        
+    except Exception as e:
+        logger.error(f"Errore nel caricamento configurazione Kafka: {e}")
+        return None
 
 
 def setup_logging() -> None:

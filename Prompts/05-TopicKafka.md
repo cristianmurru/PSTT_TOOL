@@ -1,11 +1,20 @@
-Vorrei aggiungere una nuova importante funzionalità, devo estrarre dati dal db Oracle CDG con cadenza giornaliera ed esportare le informazioni estratte su un topic Kafka, in messaggi JSON.
-La soluzione deve consentire di effettuare estrazioni anche da db sql server e postgre e deve essere configurabile anche il topic Kafka sul quale iniettare i messaggi.
-La soluzione deve essere molto robusta ed in caso di errore devono essere previsti meccanismi di retry.
-Devono essere utilizzate soluzione freeware o opensource.
-Considera quanto già sviluppato ed il requirements.txt, se possibile riutilizzare qualcosa, ma è necessaria la massima attenzione a non introdurre regressioni.
-Serve un layout di progetto ed un piano di implementazione modulare. 
-L'approccio deve essere scalabile, in fase iniziale ipotizzo che debbano essere prodotti 20000 messaggi al giorni.
-L'integrazione deve essere graduale, ogni step indipendente e testabile.
-Rileggi le istruzioni indicate in #file..\prompts\copilot-instructions.md.
-Prima di iniziare a scrivere il codice, illustra il piano di attività che vuoi eseguire e chiedi conferma, mi serve il layout di procetto ed un piano di implementazione progressivo diviso in step modulari, fornisci una stima pessimistica dei tempi necessari.
+Obiettivo: 
+Progettare una soluzione per estrarre dati da DB Oracle CDG (e successivamente SQL Server e PostgreSQL) con cadenza giornaliera e pubblicarli su un topic Kafka in formato JSON.
 
+Contesto: 
+Considera il requirements.txt, se possibile riutilizzare qualcosa, ma è necessaria la massima attenzione a non introdurre regressioni.
+I file allegati ProvaQueryJSon.sql e ProvaFileJSon.Json sono prodotti a titolo di esempio, come base per iniziare l'implementazione, l'analisi per definire la query per l'estrazione del recordset ed il payload json deve ancora essere effettuata.
+
+Vincoli:
+Soluzioni freeware o opensource.
+Robustezza con meccanismi di retry.
+Scalabilità (in fase iniziale l'applicazione dovrà generare almeno 20.000 messaggi/giorno, a tendere i messaggi generati potrebbero essere 200000/giorno).
+Integrazione graduale, step modulari e testabili.
+Riutilizzare quanto già sviluppato senza introdurre regressioni.
+
+Output atteso:
+Un documento con:
+Layout del progetto (diagrammi, moduli, flussi).
+Piano di implementazione progressivo diviso in step modulari.
+Stima pessimistica dei tempi per ogni step.
+Istruzioni: Prima di scrivere codice, illustra il piano e chiedi conferma.

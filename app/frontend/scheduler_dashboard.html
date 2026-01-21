@@ -24,6 +24,7 @@
                 </div>
                 <div class="flex items-center gap-4">
                     <a href="/" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf015;</span>Home</a>
+                    <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
                     <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
                     <a href="/settings" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf013;</span>Impostazioni</a>
                 </div>
@@ -127,6 +128,7 @@
                             <select class="form-input" name="sharing_mode" id="sharingModeSelect">
                                 <option value="filesystem">Filesystem</option>
                                 <option value="email">Email</option>
+                                <option value="kafka">Kafka</option>
                             </select>
                         </div>
                         <div id="outputDirBox">
@@ -148,6 +150,24 @@ Saluti,
 Report_PSTT</textarea>
                             <div class="text-xs text-gray-500 mt-1">Token disponibili: {query_name}, {date}, {date-1}, {timestamp}</div>
                             <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
+                        </div>
+                        <!-- Campi Kafka (ADD form) -->
+                        <div id="kafkaFieldsBox" style="display:none;">
+                            <label class="form-label">Topic Kafka</label>
+                            <input type="text" class="form-input" name="kafka_topic" id="kafkaTopicInput" placeholder="pstt-data">
+                            
+                            <label class="form-label mt-2">Message Key Field</label>
+                            <input type="text" class="form-input" name="kafka_key_field" id="kafkaKeyFieldInput" placeholder="BARCODE">
+                            <div class="text-xs text-gray-500 mt-1">Campo della query da usare come chiave messaggio Kafka</div>
+                            
+                            <label class="form-label mt-2">Batch Size</label>
+                            <input type="number" class="form-input" name="kafka_batch_size" id="kafkaBatchSizeInput" value="100" min="1" max="1000">
+                            <div class="text-xs text-gray-500 mt-1">Numero di messaggi per batch (default: 100)</div>
+                            
+                            <label class="form-label mt-2">
+                                <input type="checkbox" name="kafka_include_metadata" id="kafkaIncludeMetadataInput" checked>
+                                Includi metadata (timestamp, source, query info)
+                            </label>
                         </div>
                     </div>
                     <div class="flex gap-3 mb-2">
@@ -237,6 +257,7 @@ Report_PSTT</textarea>
                             <select class="form-input" name="sharing_mode" id="editSharingModeSelect">
                                 <option value="filesystem">Filesystem</option>
                                 <option value="email">Email</option>
+                                <option value="kafka">Kafka</option>
                             </select>
                         </div>
                         <div id="editOutputDirBox">
@@ -254,6 +275,24 @@ Report_PSTT</textarea>
                             <textarea class="form-input" name="email_body" id="editEmailBodyInput" style="height:160px" placeholder="Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT"></textarea>
                             <div class="text-xs text-gray-500 mt-1">Token disponibili: {query_name}, {date}, {date-1}, {timestamp}</div>
                             <div class="text-xs text-gray-500 mt-1">Usa '|' come separatore tra più destinatari. Il corpo è plain text.</div>
+                        </div>
+                        <!-- Campi Kafka (EDIT form) -->
+                        <div id="editKafkaFieldsBox" style="display:none;">
+                            <label class="form-label">Topic Kafka</label>
+                            <input type="text" class="form-input" name="kafka_topic" id="editKafkaTopicInput" placeholder="pstt-data">
+                            
+                            <label class="form-label mt-2">Message Key Field</label>
+                            <input type="text" class="form-input" name="kafka_key_field" id="editKafkaKeyFieldInput" placeholder="BARCODE">
+                            <div class="text-xs text-gray-500 mt-1">Campo della query da usare come chiave messaggio Kafka</div>
+                            
+                            <label class="form-label mt-2">Batch Size</label>
+                            <input type="number" class="form-input" name="kafka_batch_size" id="editKafkaBatchSizeInput" value="100" min="1" max="1000">
+                            <div class="text-xs text-gray-500 mt-1">Numero di messaggi per batch (default: 100)</div>
+                            
+                            <label class="form-label mt-2">
+                                <input type="checkbox" name="kafka_include_metadata" id="editKafkaIncludeMetadataInput" checked>
+                                Includi metadata (timestamp, source, query info)
+                            </label>
                         </div>
                     </div>
                     <div class="flex gap-3 mb-2">
@@ -625,18 +664,32 @@ function setupFormToggles() {
     const sharingMode = document.getElementById('sharingModeSelect');
     const outputDirBox = document.getElementById('outputDirBox');
     const emailBox = document.getElementById('emailFieldsBox');
+    const kafkaBox = document.getElementById('kafkaFieldsBox');
     sharingMode?.addEventListener('change', () => {
-        if (sharingMode.value === 'email') { emailBox.style.display = 'block'; outputDirBox.style.display = 'none'; }
-        else { emailBox.style.display = 'none'; outputDirBox.style.display = 'block'; }
+        if (sharingMode.value === 'email') { 
+            emailBox.style.display = 'block'; 
+            outputDirBox.style.display = 'none'; 
+            kafkaBox.style.display = 'none';
+        } else if (sharingMode.value === 'kafka') {
+            kafkaBox.style.display = 'block';
+            outputDirBox.style.display = 'none';
+            emailBox.style.display = 'none';
+        } else { 
+            emailBox.style.display = 'none'; 
+            kafkaBox.style.display = 'none';
+            outputDirBox.style.display = 'block'; 
+        }
     });
 
     const editSharingMode = document.getElementById('editSharingModeSelect');
     const editOutputDirBox = document.getElementById('editOutputDirBox');
     const editEmailBox = document.getElementById('editEmailFieldsBox');
+    const editKafkaBox = document.getElementById('editKafkaFieldsBox');
     editSharingMode?.addEventListener('change', () => {
         if (editSharingMode.value === 'email') {
             editEmailBox.style.display = 'block';
             editOutputDirBox.style.display = 'none';
+            editKafkaBox.style.display = 'none';
             // Prefill defaults on switch to Email if empty
             const subjEl = document.querySelector('#edit-form input[name="email_subject"]');
             const bodyEl = document.querySelector('#edit-form textarea[name="email_body"]');
@@ -644,8 +697,13 @@ function setupFormToggles() {
             const DEFAULT_BODY = "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT";
             if (subjEl && !subjEl.value) subjEl.value = DEFAULT_SUBJECT;
             if (bodyEl && !bodyEl.value) bodyEl.value = DEFAULT_BODY;
+        } else if (editSharingMode.value === 'kafka') {
+            editKafkaBox.style.display = 'block';
+            editOutputDirBox.style.display = 'none';
+            editEmailBox.style.display = 'none';
         } else {
             editEmailBox.style.display = 'none';
+            editKafkaBox.style.display = 'none';
             editOutputDirBox.style.display = 'block';
         }
     });
@@ -760,6 +818,7 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
     toggleFieldsForMode(form, mode);
     const days = Array.from(form.days_of_week.selectedOptions).map(opt => parseInt(opt.value));
     const endDateIso = parseDDMMYYYYtoISO(form.end_date ? form.end_date.value : '');
+    const sharingMode = form.sharing_mode ? form.sharing_mode.value : 'filesystem';
     const data = {
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
@@ -772,7 +831,7 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
         output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
         output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
-        sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
+        sharing_mode: sharingMode,
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
         // email fields (UI)
         email_to: form.email_to ? form.email_to.value || undefined : undefined,
@@ -780,6 +839,18 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         email_subject: form.email_subject ? form.email_subject.value || undefined : undefined,
         email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
+    
+    // Add Kafka configuration if Kafka mode is selected
+    if (sharingMode === 'kafka') {
+        data.kafka_config = {
+            enabled: true,
+            topic: form.kafka_topic ? form.kafka_topic.value : 'pstt-traces',
+            message_key_field: form.kafka_key_field ? form.kafka_key_field.value || null : null,
+            batch_size: form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100,
+            include_metadata: form.kafka_include_metadata ? form.kafka_include_metadata.checked : true
+        };
+    }
+    
     fetch('/api/scheduler/scheduling', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -799,6 +870,7 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
     toggleFieldsForMode(form, mode);
     const days = Array.from(form.days_of_week.selectedOptions).map(opt => parseInt(opt.value));
     const endDateIso = parseDDMMYYYYtoISO(form.end_date ? form.end_date.value : '');
+    const sharingMode = form.sharing_mode ? form.sharing_mode.value : 'filesystem';
     const data = {
         query: form.query.value,
         hour: mode === 'classic' ? (form.hour.value ? parseInt(form.hour.value) : undefined) : undefined,
@@ -811,7 +883,7 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
         output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
         output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
-        sharing_mode: form.sharing_mode ? form.sharing_mode.value : 'filesystem',
+        sharing_mode: sharingMode,
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
         // email fields (UI)
         email_to: form.email_to ? form.email_to.value || undefined : undefined,
@@ -819,6 +891,18 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         email_subject: form.email_subject ? form.email_subject.value || undefined : undefined,
         email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
+    
+    // Add Kafka configuration if Kafka mode is selected
+    if (sharingMode === 'kafka') {
+        data.kafka_config = {
+            enabled: true,
+            topic: form.kafka_topic ? form.kafka_topic.value : 'pstt-traces',
+            message_key_field: form.kafka_key_field ? form.kafka_key_field.value || null : null,
+            batch_size: form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100,
+            include_metadata: form.kafka_include_metadata ? form.kafka_include_metadata.checked : true
+        };
+    }
+    
     fetch(`/api/scheduler/scheduling/${idx}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

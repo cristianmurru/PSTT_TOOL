@@ -56,3 +56,8 @@ pre-commit==3.6.0         # Git hooks
 # Monitoring e Health Check
 psutil==5.9.6             # System monitoring
 requests==2.31.0          # HTTP requests
+
+# Kafka Integration
+kafka-python-ng==2.2.2    # Kafka Producer/Consumer (maintained fork)
+aiokafka==0.10.0          # Async Kafka client (FastAPI-friendly)
+# confluent-kafka==2.3.0  # Alternative: Confluent client (C-based, high performance)
