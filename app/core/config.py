@@ -298,17 +298,22 @@ def get_kafka_config() -> Optional[Dict[str, Any]]:
             return None
         
         from app.models.kafka import KafkaConnectionConfig, KafkaProducerConfig
+
+        def _none_if_blank(v: Optional[str]) -> Optional[str]:
+            if isinstance(v, str) and v.strip() == "":
+                return None
+            return v
         
         # Configurazione connessione
         connection_config = KafkaConnectionConfig(
             bootstrap_servers=settings.kafka_bootstrap_servers,
             security_protocol=settings.kafka_security_protocol,
-            sasl_mechanism=settings.kafka_sasl_mechanism,
-            sasl_username=settings.kafka_sasl_username,
-            sasl_password=settings.kafka_sasl_password,
-            ssl_cafile=settings.kafka_ssl_cafile,
-            ssl_certfile=settings.kafka_ssl_certfile,
-            ssl_keyfile=settings.kafka_ssl_keyfile
+            sasl_mechanism=_none_if_blank(settings.kafka_sasl_mechanism),
+            sasl_username=_none_if_blank(settings.kafka_sasl_username),
+            sasl_password=_none_if_blank(settings.kafka_sasl_password),
+            ssl_cafile=_none_if_blank(settings.kafka_ssl_cafile),
+            ssl_certfile=_none_if_blank(settings.kafka_ssl_certfile),
+            ssl_keyfile=_none_if_blank(settings.kafka_ssl_keyfile)
         )
         
         # Configurazione producer
