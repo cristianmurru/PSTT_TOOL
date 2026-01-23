@@ -61,3 +61,9 @@ requests==2.31.0          # HTTP requests
 kafka-python-ng==2.2.2    # Kafka Producer/Consumer (maintained fork)
 aiokafka==0.10.0          # Async Kafka client (FastAPI-friendly)
 # confluent-kafka==2.3.0  # Alternative: Confluent client (C-based, high performance)
+
+# Compression Codecs (optional, enable when using compression)
+# Install these to use kafka producer compression: snappy, lz4, zstd
+python-snappy==0.7.1
+lz4==4.3.3
+zstandard==0.23.0

@@ -99,6 +99,19 @@
       }
     }
   ],
+  "kafka_connections": {
+    "Kafka-COL": {
+      "name": "Kafka-COL",
+      "bootstrap_servers": "TLOGKAF01A:9092,TLOGKAF02A:9092,TLOGKAF03A:9092",
+      "security_protocol": "PLAINTEXT",
+      "sasl_mechanism": null,
+      "sasl_username": null,
+      "sasl_password": null,
+      "default_topic": "PSTT.TEST-COLL",
+      "environment": "collaudo",
+      "description": "Collaudo"
+    }
+  },
   "scheduling": [
     {
       "query": "CDG-INF-001--Visualizza Legenda Eventi-Tracce.sql",
@@ -115,8 +128,8 @@
         5,
         6
       ],
-      "hour": 10,
-      "minute": 50,
+      "hour": 16,
+      "minute": 18,
       "second": null,
       "cron_expression": null,
       "end_date": null,
@@ -321,6 +334,37 @@
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
       "kafka_connection": null
+    },
+    {
+      "query": "CDG-KAFKA-001--SelezioneTracceGiornaliere.sql",
+      "connection": "A00-CDG-Collaudo",
+      "enabled": true,
+      "description": null,
+      "scheduling_mode": "classic",
+      "days_of_week": [
+        4
+      ],
+      "hour": 12,
+      "minute": 45,
+      "second": null,
+      "cron_expression": null,
+      "end_date": "2026-01-24",
+      "output_filename_template": "{query_name}_{date}.xlsx",
+      "output_date_format": "%Y-%m-%d",
+      "output_offset_days": 0,
+      "output_include_timestamp": false,
+      "sharing_mode": "kafka",
+      "output_dir": null,
+      "email_recipients": null,
+      "email_to": null,
+      "email_cc": null,
+      "email_subject": null,
+      "email_body": "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT",
+      "kafka_topic": "PSTT.TEST-COLL",
+      "kafka_key_field": "BARCODE",
+      "kafka_batch_size": 100,
+      "kafka_include_metadata": true,
+      "kafka_connection": "Kafka-COL"
     }
   ]
 }

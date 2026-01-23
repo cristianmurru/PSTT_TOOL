@@ -89,3 +89,8 @@ Thumbs.db
 # Backup files
 *.bak
 *.backup
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/

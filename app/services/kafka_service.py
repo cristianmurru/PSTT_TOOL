@@ -112,12 +112,38 @@ class KafkaService:
         try:
             logger.info(f"[KAFKA] Connessione a Kafka cluster: {self.connection_config.bootstrap_servers}")
 
+            # Risolvi compressione con fallback se libreria mancante
+            compression_value = self.producer_config.compression_type.value
+            try:
+                from app.models.kafka import CompressionType
+                if self.producer_config.compression_type == CompressionType.SNAPPY:
+                    try:
+                        import snappy  # type: ignore
+                    except Exception:
+                        logger.warning("[KAFKA] Libreria snappy non trovata: fallback a NONE")
+                        compression_value = CompressionType.NONE.value
+                elif self.producer_config.compression_type == CompressionType.LZ4:
+                    try:
+                        import lz4.frame  # type: ignore
+                    except Exception:
+                        logger.warning("[KAFKA] Libreria lz4 non trovata: fallback a NONE")
+                        compression_value = CompressionType.NONE.value
+                elif self.producer_config.compression_type == CompressionType.ZSTD:
+                    try:
+                        import zstandard  # type: ignore
+                    except Exception:
+                        logger.warning("[KAFKA] Libreria zstandard non trovata: fallback a NONE")
+                        compression_value = CompressionType.NONE.value
+            except Exception:
+                # In caso di problemi imprevisti, usa NONE
+                compression_value = "none"
+
             # Configurazione producer
             producer_kwargs = {
                 "bootstrap_servers": self.connection_config.get_bootstrap_servers_list(),
                 "value_serializer": lambda v: json.dumps(v, cls=KafkaJSONEncoder).encode("utf-8"),
                 "key_serializer": lambda k: str(k).encode("utf-8") if k else None,
-                "compression_type": self.producer_config.compression_type.value,
+                "compression_type": compression_value,
                 "batch_size": self.producer_config.batch_size,
                 "linger_ms": self.producer_config.linger_ms,
                 "max_request_size": self.producer_config.max_request_size,
@@ -150,9 +176,13 @@ class KafkaService:
                     if self.connection_config.ssl_keyfile:
                         producer_kwargs["ssl_keyfile"] = self.connection_config.ssl_keyfile
 
-            # Idempotenza (raccomandato per evitare duplicati)
+            # Idempotenza: kafka-python-ng non supporta il flag 'enable_idempotence'.
+            # Manteniamo configurazioni conservative (es. acks=all) senza passare chiavi non riconosciute.
+            # Nota: se in futuro si userà un client che supporta idempotenza, aggiungere mapping qui.
+            # (Evitiamo l'errore "Unrecognized configs: {'enable_idempotence': True}")
             if self.producer_config.enable_idempotence:
-                producer_kwargs["enable_idempotence"] = True
+                # Assicura acks='all' per durabilità; non impostare chiave non supportata.
+                producer_kwargs["acks"] = self.producer_config.acks
 
             # Crea producer (operazione sincrona)
             self.producer = await asyncio.to_thread(KafkaProducer, **producer_kwargs)

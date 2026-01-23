@@ -14,7 +14,8 @@
 param(
     [string]$ServiceName = "PSTT_Tool",
     [string]$DisplayName = "PSTT Tool - Query Scheduler",
-    [string]$Description = "Servizio per schedulazione e esecuzione automatica query Oracle/SQL Server"
+    [string]$Description = "Servizio per schedulazione e esecuzione automatica query Oracle/SQL Server",
+    [int]$Port = 8000
 )
 
 $ErrorActionPreference = "Stop"
@@ -43,6 +44,8 @@ $projectRoot = $PSScriptRoot
 $pythonExe = Join-Path $projectRoot ".venv\Scripts\python.exe"
 $mainPy = Join-Path $projectRoot "main.py"
 $logDir = Join-Path $projectRoot "logs"
+$exportsDir = Join-Path $projectRoot "exports"
+$exportsTmpDir = Join-Path $exportsDir "_tmp"
 
 # Verifica presenza file necessari
 if (-not (Test-Path $pythonExe)) {
@@ -54,9 +57,13 @@ if (-not (Test-Path $mainPy)) {
     exit 1
 }
 
-# Crea cartella logs se non esiste
-if (-not (Test-Path $logDir)) {
-    New-Item -ItemType Directory -Path $logDir | Out-Null
+# Crea cartelle necessarie se non esistono
+Write-Host "Verifica/creazione directories necessarie..."
+foreach ($dir in @($logDir, $exportsDir, $exportsTmpDir)) {
+    if (-not (Test-Path $dir)) {
+        New-Item -ItemType Directory -Path $dir | Out-Null
+        Write-Host "  Creata: $dir" -ForegroundColor Green
+    }
 }
 
 # Rimuovi servizio esistente se presente
@@ -69,8 +76,8 @@ if ($existingService) {
 }
 
 # Installa servizio
-Write-Host "Installazione servizio $ServiceName..."
-nssm install $ServiceName $pythonExe $mainPy
+Write-Host "Installazione servizio $ServiceName sulla porta $Port..."
+nssm install $ServiceName $pythonExe "$mainPy --port $Port"
 
 # Configura parametri servizio
 Write-Host "Configurazione parametri..."

@@ -400,3 +400,24 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ODBC Driver 18 for SQL Server (per connessioni SQL Server)
 - Memoria RAM: minimo 2GB, consigliato 4GB
 - Storage: 500MB per installazione base
+## [1.1.1] - [2026-01-23] - Kafka UI metriche allineate, consumer diagnostica e usabilità
+
+### Changed
+- Dashboard Kafka: metriche aggregate allineate agli output dello scheduler (riepilogo, per‑topic, ultimi errori) con filtri periodo e drill‑down.
+- Pulsanti e stati UI: "Leggi Messaggi" ora è disabilitato (grigio) finché la connessione Kafka non è testata; diventa verde quando attiva.
+
+### Added
+- Pannello "Consumer Rapido": lettura messaggi con selezione origine offset (`latest`/`earliest`).
+- Diagnostica topic: nuovo pulsante "Info Topic" lato UI e relativo endpoint API per partizioni e range offset.
+- Suggerimenti topic: datalist con topic di default (es. `PSTT.TEST-COLL`) e suggerimenti contestuali.
+- API Kafka:
+  - `GET /api/kafka/topic-info/{topic}` — informazioni partizioni e offset.
+
+### Fixed
+- `/api/kafka/consume`: rispetto del parametro `period` con seek iniziale coerente e timeout aumentati.
+- Script PowerShell `tools/create_kafka_deploy_package.ps1`: rimossa variabile non utilizzata che causava warning dell'analyzer.
+
+### Test
+- Suite completa: 196 passed, 0 failed.
+
+---

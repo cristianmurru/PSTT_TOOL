@@ -64,6 +64,9 @@
         <!-- Status Bar -->
         <div class="status-bar text-white p-3">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between text-sm">
+
+    <!-- Topic suggestions datalist -->
+    <datalist id="topicSuggestions"></datalist>
                 <div class="flex items-center space-x-4">
                     <span>Connessione Kafka: 
                         <span id="kafkaConnectionName" class="font-medium">Nessuna</span>
@@ -85,67 +88,7 @@
         <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
             <div class="px-4 py-6 sm:px-0">
 
-                <!-- Connection Management Section -->
-                <div class="bg-white shadow rounded-lg p-6 mb-6">
-                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
-                        <i class="fas fa-plug mr-2"></i>Gestione Connessioni Kafka
-                    </h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Connection Selector -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Seleziona Connessione
-                            </label>
-                            <select id="kafkaConnectionSelect" 
-                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                <option value="">Caricamento...</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Connection Actions -->
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Azioni</label>
-                            <div class="flex space-x-2">
-                                <button id="testConnectionBtn" 
-                                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
-                                    <i class="fas fa-check-circle mr-2"></i>Test Connessione
-                                </button>
-                                <button id="refreshConnectionsBtn" 
-                                        class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition">
-                                    <i class="fas fa-sync-alt mr-2"></i>Aggiorna
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Connection Info -->
-                    <div id="connectionInfo" class="mt-4 hidden">
-                        <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
-                            <h3 class="text-sm font-medium text-gray-700 mb-2">Informazioni Connessione</h3>
-                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                <div>
-                                    <span class="text-gray-600">Servers:</span>
-                                    <p id="infoServers" class="font-medium text-gray-900">-</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Environment:</span>
-                                    <p id="infoEnvironment" class="font-medium text-gray-900">-</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Timeout:</span>
-                                    <p id="infoTimeout" class="font-medium text-gray-900">-</p>
-                                </div>
-                                <div>
-                                    <span class="text-gray-600">Stato:</span>
-                                    <p id="infoStatus" class="font-medium">-</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Metrics Section -->
+                <!-- Metrics Section (moved to top) -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div class="metric-card">
                         <div class="flex items-center justify-between">
@@ -188,6 +131,231 @@
                     </div>
                 </div>
 
+                <!-- Topic Breakdown + Recent Errors (moved to top) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <!-- Breakdown per Topic -->
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-3">
+                            <i class="fas fa-list mr-2"></i>Breakdown per Topic (oggi)
+                        </h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-gray-600 border-b">
+                                        <th class="py-2 pr-4">Topic</th>
+                                        <th class="py-2 pr-4">Inviati</th>
+                                        <th class="py-2 pr-4">Falliti</th>
+                                        <th class="py-2 pr-4">Bytes</th>
+                                        <th class="py-2 pr-4">Ultimo Invio</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topicBreakdownBody">
+                                    <tr><td class="py-2 text-gray-500" colspan="5">Nessun dato</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Errori Recenti -->
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <h2 class="text-lg font-semibold text-gray-900 mb-3">
+                            <i class="fas fa-triangle-exclamation mr-2"></i>Errori Recenti
+                        </h2>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="text-left text-gray-600 border-b">
+                                        <th class="py-2 pr-4">Timestamp</th>
+                                        <th class="py-2 pr-4">Topic</th>
+                                        <th class="py-2 pr-4">Errore</th>
+                                        <th class="py-2 pr-4">Falliti</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentErrorsBody">
+                                    <tr><td class="py-2 text-gray-500" colspan="4">Nessun errore</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connection Management Section -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-plug mr-2"></i>Gestione Connessioni Kafka
+                    </h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Connection Selector -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">
+                                Seleziona Connessione
+                            </label>
+                            <select id="kafkaConnectionSelect" 
+                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Caricamento...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Connection Actions -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Azioni</label>
+                            <div class="flex space-x-2">
+                                <button id="testConnectionBtn" 
+                                        class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+                                    <i class="fas fa-check-circle mr-2"></i>Test Connessione (profilo selezionato)
+                                </button>
+                                <button id="editConnectionBtn" 
+                                        class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition">
+                                    <i class="fas fa-pen mr-2"></i>Modifica
+                                </button>
+                                <button id="addConnectionBtn" 
+                                        class="bg-green-700 text-white px-4 py-2 rounded-md hover:bg-green-800 transition">
+                                    <i class="fas fa-plus mr-2"></i>Aggiungi
+                                </button>
+                                <button id="refreshConnectionsBtn" 
+                                        class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition">
+                                    <i class="fas fa-sync-alt mr-2"></i>Aggiorna
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connection Info -->
+                    <div id="connectionInfo" class="mt-4">
+                        <div class="bg-gray-50 border border-gray-200 rounded-md p-4">
+                            <h3 class="text-sm font-medium text-gray-700 mb-2">Informazioni Connessione</h3>
+                            <div class="grid grid-cols-2 md:grid-cols-6 gap-2 text-sm items-start">
+                                <div class="col-span-2 md:col-span-3 whitespace-nowrap">
+                                    <span class="text-gray-600">Servers:</span>
+                                    <p id="infoServers" class="font-medium text-gray-900 whitespace-nowrap">-</p>
+                                </div>
+                                <div class="md:col-span-1">
+                                    <span class="text-gray-600">Timeout:</span>
+                                    <p id="infoTimeout" class="font-medium text-gray-900">-</p>
+                                </div>
+                                <div class="md:col-span-1">
+                                    <span class="text-gray-600">Environment:</span>
+                                    <p id="infoEnvironment" class="font-medium text-gray-900">-</p>
+                                </div>
+                                <div class="md:col-span-1">
+                                    <span class="text-gray-600">Stato:</span>
+                                    <p id="infoStatus" class="font-medium">-</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Manage Connection Form -->
+                    <div id="manageForm" class="mt-6 hidden">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">Crea/Aggiorna Connessione</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                                <input type="text" id="mcName" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="es: Kafka-COL">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Bootstrap Servers</label>
+                                <input type="text" id="mcBootstrap" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="host1:9092,host2:9092">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Security Protocol</label>
+                                <select id="mcSecurity" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                    <option>PLAINTEXT</option>
+                                    <option>SSL</option>
+                                    <option>SASL_PLAINTEXT</option>
+                                    <option>SASL_SSL</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">SASL Mechanism (opz.)</label>
+                                <input type="text" id="mcSaslMech" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="PLAIN|SCRAM-SHA-256|SCRAM-SHA-512">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">SASL Username (opz.)</label>
+                                <input type="text" id="mcSaslUser" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">SASL Password (opz.)</label>
+                                <input type="password" id="mcSaslPass" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Default Topic (opz.)</label>
+                                <input type="text" id="mcDefaultTopic" class="w-full border border-gray-300 rounded-md px-3 py-2" placeholder="es: PSTT.TEST-COLL">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Environment (opz.)</label>
+                                <select id="mcEnvironment" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                    <option value="">-- nessuno --</option>
+                                    <option value="collaudo">Collaudo</option>
+                                    <option value="produzione">Produzione</option>
+                                    <option value="sviluppo">Sviluppo</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Descrizione (opz.)</label>
+                                <input type="text" id="mcDescription" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                            </div>
+                        </div>
+                        <div class="mt-3 flex gap-2">
+                            <button id="mcTestBtn" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"><i class="fas fa-vial mr-2"></i>Ping (parametri sopra)</button>
+                            <button id="mcSaveBtn" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"><i class="fas fa-save mr-2"></i>Salva</button>
+                            <button id="mcDeleteBtn" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition"><i class="fas fa-trash mr-2"></i>Elimina</button>
+                            <button id="mcCancelBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"><i class="fas fa-times mr-2"></i>Annulla</button>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-2">Suggerimento: "Test Connessione" usa il profilo salvato selezionato in alto. "Ping" verifica i valori inseriti nel form senza salvarli.</p>
+                    </div>
+                </div>
+
+                <!-- Metrics Section moved above -->
+
+                <!-- Breakdown + Errors moved above -->
+
+                <!-- Consumer Rapido (moved directly under connections) -->
+                <div class="bg-white shadow rounded-lg p-6 mb-6">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-1">
+                        <i class="fas fa-download mr-2"></i>Consumer Rapido
+                    </h2>
+                    <p class="text-xs text-gray-500 mb-3">Connessione selezionata: <span id="consumerSelectedConn">Nessuna</span> — scegli la connessione nel pannello sopra.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Topic</label>
+                            <input type="text" id="consumerTopic" placeholder="es: pstt-data" list="topicSuggestions"
+                                class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Messaggi da leggere</label>
+                            <input type="number" id="consumerMax" value="50" min="1" max="1000"
+                                   class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Origine offset</label>
+                            <select id="consumerPeriod" class="w-full border border-gray-300 rounded-md px-3 py-2">
+                                <option value="latest">Ultimi (coda)</option>
+                                <option value="earliest">Dall'inizio</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Decodifica automatica</label>
+                            <div class="flex items-center gap-2">
+                                <input type="checkbox" id="consumerAutoDecode" checked>
+                                <span class="text-xs text-gray-500">JSON con fallback (snappy/lz4/zstd → none)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="consumeBtn" class="bg-gray-300 text-gray-600 px-6 py-2 rounded-md cursor-not-allowed" disabled>
+                            <i class="fas fa-play mr-2"></i>Leggi Messaggi
+                        </button>
+                        <button id="topicInfoBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition">
+                            <i class="fas fa-info-circle mr-2"></i>Info Topic
+                        </button>
+                    </div>
+                    <div class="mt-4">
+                        <pre id="consumerOutput" class="bg-gray-50 border border-gray-200 rounded-md p-3 overflow-auto text-sm"></pre>
+                    </div>
+                </div>
+
                 <!-- Publish Message Section -->
                 <div class="bg-white shadow rounded-lg p-6 mb-6">
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">
@@ -197,7 +365,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Topic</label>
-                            <input type="text" id="publishTopic" placeholder="es: test-topic" 
+                            <input type="text" id="publishTopic" placeholder="es: test-topic" list="topicSuggestions"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
@@ -228,7 +396,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Topic</label>
-                            <input type="text" id="batchTopic" placeholder="es: batch-topic" 
+                            <input type="text" id="batchTopic" placeholder="es: batch-topic" list="topicSuggestions"
                                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
@@ -259,7 +427,7 @@
                     
                     <!-- Batch Result -->
                     <div id="batchResult" class="mt-4 hidden">
-                        <div class="bg-blue-50 border border-blue-200 rounded-md p-4">
+                            <button id="mcNewBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"><i class="fas fa-file mr-2"></i>Nuovo</button>
                             <h4 class="text-sm font-medium text-blue-900 mb-2">Risultato Batch</h4>
                             <div class="grid grid-cols-3 gap-4 text-sm">
                                 <div>
@@ -278,6 +446,8 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Consumer moved above -->
 
             </div>
         </div>
@@ -307,6 +477,33 @@
             }, 3000);
         }
 
+        // Stato connessione attiva al cluster (abilita consumer solo se true)
+        let kafkaConnected = false;
+
+        // Default topic suggestion (fallback if profile doesn't have one)
+        const FALLBACK_DEFAULT_TOPIC = 'PSTT.TEST-COLL';
+
+        function updateTopicSuggestion(defaultTopic) {
+            const topic = defaultTopic || FALLBACK_DEFAULT_TOPIC;
+            const dl = document.getElementById('topicSuggestions');
+            if (dl) {
+                dl.innerHTML = `<option value="${topic}"></option>`;
+            }
+            const consumerInput = document.getElementById('consumerTopic');
+            const publishInput = document.getElementById('publishTopic');
+            const batchInput = document.getElementById('batchTopic');
+            if (consumerInput) {
+                consumerInput.placeholder = topic;
+                if (!consumerInput.value) consumerInput.value = topic;
+            }
+            if (publishInput) {
+                publishInput.placeholder = topic;
+            }
+            if (batchInput) {
+                batchInput.placeholder = topic;
+            }
+        }
+
         // Load Kafka connections
         async function loadConnections() {
             try {
@@ -320,13 +517,24 @@
                 data.connections.forEach(conn => {
                     const option = document.createElement('option');
                     option.value = conn.name;
-                    option.textContent = `${conn.name} (${conn.environment}) - ${conn.bootstrap_servers}`;
+                    option.textContent = `${conn.name} - ${conn.bootstrap_servers}`;
                     select.appendChild(option);
                 });
                 
                 if (data.default_connection) {
                     select.value = data.default_connection;
+                    try {
+                        const detail = await fetch(`/api/kafka/connections/${encodeURIComponent(select.value)}`).then(r=>r.json());
+                        updateTopicSuggestion(detail.default_topic);
+                    } catch (e) {
+                        updateTopicSuggestion();
+                    }
+                } else {
+                    updateTopicSuggestion();
                 }
+
+                // Update consumer state based on current selection
+                updateConsumerStateFromSelection();
             } catch (error) {
                 showToast('Errore nel caricamento delle connessioni: ' + error.message, 'error');
             }
@@ -345,6 +553,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Testing...';
             
             try {
+                const detail = await fetch(`/api/kafka/connections/${connectionName}`).then(r=>r.json());
                 const response = await fetch('/api/kafka/test-connection', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -352,32 +561,45 @@
                 });
                 
                 const data = await response.json();
-                
-                if (data.success) {
-                    showToast('Connessione riuscita!', 'success');
-                    updateConnectionInfo(data.connection_info);
-                    updateStatusBar(connectionName, true);
-                } else {
-                    showToast('Connessione fallita: ' + data.error, 'error');
-                    updateStatusBar(connectionName, false);
-                }
+                const ok = !!data.connected && !data.error;
+                showToast(ok ? 'Connessione riuscita!' : ('Connessione fallita: ' + (data.error || '')), ok ? 'success' : 'error');
+                updateStatusBar(connectionName, ok);
+                const info = { bootstrap_servers: detail.bootstrap_servers || '-', environment: (detail.environment ?? '-'), connected: ok };
+                if (data.latency_ms != null) info.connection_timeout_ms = data.latency_ms;
+                updateConnectionInfo(info);
+                kafkaConnected = ok;
+                updateConsumerStateFromSelection();
             } catch (error) {
                 showToast('Errore nel test: ' + error.message, 'error');
                 updateStatusBar(connectionName, false);
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Test Connessione';
+                btn.innerHTML = '<i class="fas fa-check-circle mr-2"></i>Test Connessione (profilo selezionato)';
             }
         }
 
         // Update connection info
         function updateConnectionInfo(info) {
             document.getElementById('connectionInfo').classList.remove('hidden');
-            document.getElementById('infoServers').textContent = info.bootstrap_servers;
-            document.getElementById('infoEnvironment').textContent = info.environment;
-            document.getElementById('infoTimeout').textContent = info.connection_timeout_ms + 'ms';
-            document.getElementById('infoStatus').textContent = '✅ Connesso';
-            document.getElementById('infoStatus').className = 'font-medium text-green-600';
+            if (info.bootstrap_servers !== undefined) {
+                document.getElementById('infoServers').textContent = info.bootstrap_servers;
+            }
+            if (info.environment !== undefined) {
+                document.getElementById('infoEnvironment').textContent = info.environment;
+            }
+            if (Object.prototype.hasOwnProperty.call(info, 'connection_timeout_ms')) {
+                const v = info.connection_timeout_ms;
+                const text = (typeof v === 'number') ? (Math.round(v) + 'ms') : 'n/d';
+                document.getElementById('infoTimeout').textContent = text;
+            }
+            if (Object.prototype.hasOwnProperty.call(info, 'connected')) {
+                const isOk = !!info.connected;
+                document.getElementById('infoStatus').textContent = isOk ? '✅ Connesso' : '❌ Errore';
+                document.getElementById('infoStatus').className = isOk ? 'font-medium text-green-600' : 'font-medium text-red-600';
+            } else if (Object.prototype.hasOwnProperty.call(info, 'statusText')) {
+                document.getElementById('infoStatus').textContent = info.statusText || '-';
+                document.getElementById('infoStatus').className = 'font-medium text-gray-700';
+            }
         }
 
         // Update status bar
@@ -391,32 +613,193 @@
             }
         }
 
-        // Load and display metrics
-        async function loadMetrics() {
-            const connectionName = document.getElementById('kafkaConnectionSelect').value;
-            if (!connectionName) return;
-            
+        // Update consumer panel button + label when selection changes
+        function updateConsumerStateFromSelection() {
+            const sel = document.getElementById('kafkaConnectionSelect');
+            const name = sel ? sel.value : '';
+            const label = document.getElementById('consumerSelectedConn');
+            const btn = document.getElementById('consumeBtn');
+            if (label) label.textContent = name || 'Nessuna';
+            if (btn) {
+                const disabled = (!name || !kafkaConnected);
+                btn.disabled = disabled;
+                btn.className = disabled
+                    ? 'bg-gray-300 text-gray-600 px-6 py-2 rounded-md cursor-not-allowed'
+                    : 'bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition';
+            }
+        }
+
+        // Period selector for metrics
+        const metricsPeriodSelectId = 'metricsPeriodSelect';
+
+        // Render breakdown per topic
+        function renderTopicBreakdown(byTopic) {
+            const tbody = document.getElementById('topicBreakdownBody');
+            tbody.innerHTML = '';
+            const entries = Object.entries(byTopic || {});
+            if (!entries.length) {
+                tbody.innerHTML = '<tr><td class="py-2 text-gray-500" colspan="5">Nessun dato</td></tr>';
+                return;
+            }
+            entries
+                .sort((a,b) => (b[1].messages_sent||0) - (a[1].messages_sent||0))
+                .forEach(([topic, stats]) => {
+                    const lastSend = stats.last_send ? stats.last_send : '-';
+                    const row = document.createElement('tr');
+                    row.className = 'border-b';
+                    row.innerHTML = `
+                        <td class="py-2 pr-4 font-medium text-gray-900">${topic}</td>
+                        <td class="py-2 pr-4 text-green-700">${stats.messages_sent || 0}</td>
+                        <td class="py-2 pr-4 text-red-700">${stats.messages_failed || 0}</td>
+                        <td class="py-2 pr-4">${stats.bytes_sent || 0}</td>
+                        <td class="py-2 pr-4">${lastSend}</td>
+                    `;
+                    row.style.cursor = 'pointer';
+                    row.addEventListener('click', () => drillDownTopic(topic));
+                    tbody.appendChild(row);
+                });
+        }
+
+        // Render errori recenti
+        function renderRecentErrors(errors) {
+            const tbody = document.getElementById('recentErrorsBody');
+            tbody.innerHTML = '';
+            if (!errors || !errors.length) {
+                tbody.innerHTML = '<tr><td class="py-2 text-gray-500" colspan="4">Nessun errore</td></tr>';
+                return;
+            }
+            errors.forEach(e => {
+                const row = document.createElement('tr');
+                row.className = 'border-b';
+                const ts = e.timestamp || '-';
+                const topic = e.topic || '-';
+                const err = e.error || 'Unknown error';
+                const failed = e.failed_messages || 0;
+                row.innerHTML = `
+                    <td class="py-2 pr-4">${ts}</td>
+                    <td class="py-2 pr-4">${topic}</td>
+                    <td class="py-2 pr-4 text-red-700">${err}</td>
+                    <td class="py-2 pr-4">${failed}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Drill-down per topic (mostra ultime entry)
+        async function drillDownTopic(topic) {
             try {
-                const response = await fetch(`/api/kafka/metrics?connection_name=${connectionName}`);
+                const res = await fetch(`/api/kafka/metrics/topic/${encodeURIComponent(topic)}?limit=50`);
+                const data = await res.json();
+                const lines = (data.metrics || []).map(m => JSON.stringify(m, null, 2));
+                showToast(`Topic '${topic}': ${data.count} righe`,'info');
+                const out = document.getElementById('consumerOutput');
+                out.textContent = lines.join('\n\n');
+            } catch (e) {
+                showToast('Errore drill-down topic: ' + e.message, 'error');
+            }
+        }
+
+        // Load and display metrics (aggregated summary)
+        async function loadMetrics(period = 'today') {
+            // Mostra metriche aggregate
+            try {
+                const response = await fetch(`/api/kafka/metrics/summary?period=${encodeURIComponent(period)}`);
                 if (!response.ok) return;
-                
-                const data = await response.json();
-                
-                // Update metrics cards
-                document.getElementById('metricTotalMessages').textContent = data.messages_sent || 0;
-                document.getElementById('metricSuccessRate').textContent = 
-                    (data.success_rate * 100).toFixed(1) + '%';
-                document.getElementById('metricAvgLatency').textContent = 
-                    (data.avg_latency_ms || 0).toFixed(1) + 'ms';
-                document.getElementById('metricTotalErrors').textContent = data.errors || 0;
-                
+                const summary = await response.json();
+
+                // Update metrics cards (use aggregated values)
+                const totalMessages = summary.total_messages || 0;
+                const successRate = typeof summary.success_rate === 'number' ? summary.success_rate : 0;
+                const avgLatency = typeof summary.avg_latency_ms === 'number' ? summary.avg_latency_ms : 0;
+                const totalErrors = summary.failed_messages || 0;
+
+                document.getElementById('metricTotalMessages').textContent = totalMessages;
+                document.getElementById('metricSuccessRate').textContent = successRate.toFixed(1) + '%';
+                document.getElementById('metricAvgLatency').textContent = avgLatency.toFixed(1) + 'ms';
+                document.getElementById('metricTotalErrors').textContent = totalErrors;
+
                 // Update status bar metrics
-                document.getElementById('metricMessages').textContent = data.messages_sent || 0;
-                document.getElementById('metricSuccess').textContent = data.successful || 0;
-                document.getElementById('metricErrors').textContent = data.errors || 0;
+                document.getElementById('metricMessages').textContent = totalMessages;
+                document.getElementById('metricSuccess').textContent = (summary.successful_messages || 0);
+                document.getElementById('metricErrors').textContent = totalErrors;
                 document.getElementById('metricsBar').classList.remove('hidden');
+
+                // Render breakdown + recent errors
+                renderTopicBreakdown(summary.by_topic);
+                renderRecentErrors(summary.recent_errors);
             } catch (error) {
                 console.error('Error loading metrics:', error);
+            }
+        }
+
+        // Consume quick messages
+        async function consumeMessages() {
+            const connectionName = document.getElementById('kafkaConnectionSelect').value;
+            const topic = document.getElementById('consumerTopic').value;
+            const maxMsgs = parseInt(document.getElementById('consumerMax').value);
+            const period = (document.getElementById('consumerPeriod')?.value) || 'latest';
+            const autoDecode = document.getElementById('consumerAutoDecode').checked;
+            if (!connectionName || !topic) {
+                showToast('Seleziona connessione e specifica topic', 'warning');
+                return;
+            }
+            const btn = document.getElementById('consumeBtn');
+            btn.disabled = true;
+            btn.className = 'bg-green-600 text-white px-6 py-2 rounded-md';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Lettura...';
+            try {
+                const res = await fetch('/api/kafka/consume', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ topic, connection_name: connectionName, max_messages: maxMsgs, period })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    const detail = data?.detail || `HTTP ${res.status}`;
+                    showToast('Errore lettura: ' + detail, 'error');
+                    return;
+                }
+                const out = document.getElementById('consumerOutput');
+                const lines = (data.messages || []).map(m => {
+                    if (autoDecode && m.value_json) return JSON.stringify(m, null, 2);
+                    // mostra value_text prettificato se disponibile
+                    return JSON.stringify(m, null, 2);
+                });
+                out.textContent = lines.join('\n\n');
+                showToast(`Letti ${data.count || 0} messaggi`, 'success');
+            } catch (e) {
+                showToast('Errore lettura: ' + e.message, 'error');
+            } finally {
+                const canConsume = (!!document.getElementById('kafkaConnectionSelect').value && kafkaConnected);
+                btn.disabled = !canConsume;
+                btn.className = canConsume
+                    ? 'bg-green-600 text-white px-6 py-2 rounded-md hover:bg-green-700 transition'
+                    : 'bg-gray-300 text-gray-600 px-6 py-2 rounded-md cursor-not-allowed';
+                btn.innerHTML = '<i class="fas fa-play mr-2"></i>Leggi Messaggi';
+            }
+        }
+
+        // Topic info diagnostics
+        async function showTopicInfo() {
+            const connectionName = document.getElementById('kafkaConnectionSelect').value;
+            const topic = document.getElementById('consumerTopic').value;
+            if (!connectionName || !topic) {
+                showToast('Seleziona connessione e topic', 'warning');
+                return;
+            }
+            try {
+                const res = await fetch(`/api/kafka/topic-info/${encodeURIComponent(topic)}?connection_name=${encodeURIComponent(connectionName)}`);
+                const data = await res.json();
+                if (res.ok) {
+                    const out = document.getElementById('consumerOutput');
+                    out.textContent = JSON.stringify(data, null, 2);
+                    const total = data.estimated_messages ?? 0;
+                    showToast(`Topic '${data.topic}': partizioni ${data.partitions}, stimati ${total} messaggi`, 'info');
+                } else {
+                    showToast('Errore topic-info: ' + (data.detail || res.status), 'error');
+                }
+            } catch (e) {
+                showToast('Errore topic-info: ' + e.message, 'error');
             }
         }
 
@@ -537,16 +920,113 @@
         }
 
         // Event listeners
+                // Manage Connections helpers
+                function mcFillFromSelected() {
+                    const name = document.getElementById('kafkaConnectionSelect').value;
+                    if (!name) return;
+                    fetch(`/api/kafka/connections/${name}`)
+                        .then(r => r.json())
+                        .then(d => {
+                            document.getElementById('mcName').value = d.name || name;
+                            document.getElementById('mcBootstrap').value = d.bootstrap_servers || '';
+                            document.getElementById('mcSecurity').value = d.security_protocol || 'PLAINTEXT';
+                            document.getElementById('mcSaslMech').value = d.sasl_mechanism || '';
+                            document.getElementById('mcSaslUser').value = d.sasl_username || '';
+                            document.getElementById('mcSaslPass').value = d.sasl_password || '';
+                            document.getElementById('mcDefaultTopic').value = d.default_topic || '';
+                            document.getElementById('mcEnvironment').value = d.environment || '';
+                            document.getElementById('mcDescription').value = d.description || '';
+                            // mostra pannello info (non sovrascrivere timeout)
+                            updateConnectionInfo({ bootstrap_servers: d.bootstrap_servers || '-', environment: d.environment || '-' });
+                            // aggiorna suggerimenti topic
+                            updateTopicSuggestion(d.default_topic);
+                        });
+                }
+                function mcClear() {
+                    ['mcName','mcBootstrap','mcSecurity','mcSaslMech','mcSaslUser','mcSaslPass','mcDefaultTopic','mcEnvironment','mcDescription'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (!el) return; if (el.tagName === 'SELECT') el.value = 'PLAINTEXT'; else el.value = '';
+                    });
+                }
+                async function mcTest() {
+                    const payload = {
+                        bootstrap_servers: document.getElementById('mcBootstrap').value,
+                        security_protocol: document.getElementById('mcSecurity').value,
+                        sasl_mechanism: document.getElementById('mcSaslMech').value || null,
+                        sasl_username: document.getElementById('mcSaslUser').value || null,
+                        sasl_password: document.getElementById('mcSaslPass').value || null,
+                    };
+                    const res = await fetch('/api/kafka/test-connection', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                    const data = await res.json();
+                    const ok = !!data.connected && !data.error;
+                    showToast(ok ? 'Ping OK' : ('Ping fallito: ' + (data.error || '')), ok ? 'success' : 'error');
+                }
+                async function mcSave() {
+                    const payload = {
+                        name: document.getElementById('mcName').value,
+                        bootstrap_servers: document.getElementById('mcBootstrap').value,
+                        security_protocol: document.getElementById('mcSecurity').value,
+                        sasl_mechanism: document.getElementById('mcSaslMech').value || null,
+                        sasl_username: document.getElementById('mcSaslUser').value || null,
+                        sasl_password: document.getElementById('mcSaslPass').value || null,
+                        default_topic: document.getElementById('mcDefaultTopic').value || null,
+                        environment: document.getElementById('mcEnvironment').value || null,
+                        description: document.getElementById('mcDescription').value || null,
+                    };
+                    const res = await fetch('/api/kafka/connections', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                    const out = await res.json();
+                    if (res.ok && out.success) { showToast('Connessione salvata', 'success'); loadConnections(); updateConnectionInfo({ bootstrap_servers: payload.bootstrap_servers, environment: payload.environment || '-' }); }
+                    else { showToast('Errore salvataggio: ' + (out.detail || out.error || res.status), 'error'); }
+                }
+                async function mcDelete() {
+                    const name = document.getElementById('mcName').value || document.getElementById('kafkaConnectionSelect').value;
+                    if (!name) { showToast('Seleziona o compila il nome', 'warning'); return; }
+                    const res = await fetch(`/api/kafka/connections/${encodeURIComponent(name)}`, { method:'DELETE' });
+                    const out = await res.json().catch(() => ({}));
+                    if (res.ok && out.success) { showToast('Connessione eliminata', 'success'); mcClear(); loadConnections(); }
+                    else { showToast('Errore eliminazione: ' + (out.detail || res.status), 'error'); }
+                }
+                document.getElementById('kafkaConnectionSelect').addEventListener('change', () => { mcFillFromSelected(); testConnection(); updateConsumerStateFromSelection(); });
+                function mcCancel() { document.getElementById('manageForm').classList.add('hidden'); }
+                document.getElementById('mcCancelBtn').addEventListener('click', mcCancel);
+                document.getElementById('mcTestBtn').addEventListener('click', mcTest);
+                document.getElementById('mcSaveBtn').addEventListener('click', mcSave);
+                document.getElementById('mcDeleteBtn').addEventListener('click', mcDelete);
+            document.getElementById('addConnectionBtn').addEventListener('click', () => { mcClear(); document.getElementById('manageForm').classList.remove('hidden'); });
+            document.getElementById('editConnectionBtn').addEventListener('click', () => { const name = document.getElementById('kafkaConnectionSelect').value; if (!name) { showToast('Seleziona una connessione da modificare', 'warning'); return; } mcFillFromSelected(); document.getElementById('manageForm').classList.remove('hidden'); });
         document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
         document.getElementById('refreshConnectionsBtn').addEventListener('click', loadConnections);
         document.getElementById('publishMessageBtn').addEventListener('click', publishMessage);
         document.getElementById('publishBatchBtn').addEventListener('click', publishBatch);
+        document.getElementById('consumeBtn').addEventListener('click', consumeMessages);
+        document.getElementById('topicInfoBtn').addEventListener('click', showTopicInfo);
         
+        // Period filter UI (simple select added dynamically near breakdown header)
+        (function addPeriodSelector(){
+            try {
+                const breakdownHeader = document.querySelector('h2.text-lg.font-semibold.text-gray-900.mb-3');
+                if (breakdownHeader) {
+                    const sel = document.createElement('select');
+                    sel.id = metricsPeriodSelectId;
+                    sel.className = 'ml-3 border border-gray-300 rounded px-2 py-1 text-sm';
+                    sel.innerHTML = '<option value="today">Oggi</option><option value="last_7_days">Ultimi 7 giorni</option>';
+                    breakdownHeader.appendChild(sel);
+                    sel.addEventListener('change', ()=> loadMetrics(sel.value));
+                }
+            } catch(e) {}
+        })();
+
         // Auto-refresh metrics every 5 seconds
-        setInterval(loadMetrics, 5000);
+        setInterval(()=>{ const sel = document.getElementById(metricsPeriodSelectId); loadMetrics(sel ? sel.value : 'today'); }, 5000);
         
         // Load connections on page load
-        loadConnections();
+                loadConnections();
+                // Mostra pannello info subito con placeholder
+                updateConnectionInfo({ bootstrap_servers: '-', environment: '-', connection_timeout_ms: null, statusText: '-' });
+                // Aggiorna stato consumer con nessuna selezione
+                updateConsumerStateFromSelection();
+                // Carica metriche iniziali
+                loadMetrics('today');
     </script>
 </body>
 </html>

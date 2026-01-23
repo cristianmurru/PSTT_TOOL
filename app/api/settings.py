@@ -23,7 +23,37 @@ ALLOWED_KEYS = [
     # Timeouts
     "scheduler_query_timeout_sec",
     "scheduler_write_timeout_sec",
+    # Kafka - Connection
+    "kafka_enabled",
+    "kafka_bootstrap_servers",
+    "kafka_security_protocol",
+    "kafka_sasl_mechanism",
+    "kafka_sasl_username",
+    "kafka_sasl_password",
+    # Kafka - Producer
+    "kafka_compression_type",
+    "kafka_batch_size",
+    "kafka_linger_ms",
+    "kafka_acks",
+    "kafka_enable_idempotence",
+    "kafka_max_in_flight_requests",
+    "kafka_request_timeout_ms",
+    # Kafka - Defaults
+    "kafka_default_topic",
+    "kafka_message_batch_size",
 ]
+
+# Keys where blank values are valid and should be written to .env
+ALLOW_BLANK_KEYS = {
+    # Kafka auth optional: blanks mean no SASL/creds
+    "kafka_sasl_mechanism",
+    "kafka_sasl_username",
+    "kafka_sasl_password",
+    # SSL files optional too (UI may add later if exposed)
+    "kafka_ssl_cafile",
+    "kafka_ssl_certfile",
+    "kafka_ssl_keyfile",
+}
 
 
 def _env_path() -> Path:
@@ -70,7 +100,14 @@ def update_env_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
     updates: Dict[str, str] = {}
     for k, v in payload.items():
         if k in allowed:
-            updates[k] = str(v) if v is not None else ""
+            # Skip None; allow blank for explicitly allowed keys
+            if v is None:
+                continue
+            val = str(v).strip()
+            if val == "" and k not in ALLOW_BLANK_KEYS:
+                # prevent invalid typed envs (ints/bools) being blank
+                continue
+            updates[k] = val
 
     env_file = _env_path()
     env_file.parent.mkdir(parents=True, exist_ok=True)
@@ -108,9 +145,10 @@ def update_env_settings(payload: Dict[str, Any]) -> Dict[str, Any]:
             new_lines.append(raw)
 
     # Append any updates not found in file (create entries at the end)
+    # Use UPPERCASE env key convention for new entries
     for k, v in updates.items():
         if k not in found_keys:
-            new_lines.append(f"{k}={v}")
+            new_lines.append(f"{k.upper()}={v}")
 
     try:
         env_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")

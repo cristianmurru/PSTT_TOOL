@@ -2,7 +2,7 @@
 
 **Strumento per l'esecuzione di query parametrizzate su database multi-vendor con scheduling automatico**
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 
@@ -309,6 +309,9 @@ Accedi a `/kafka` per:
 - **Breakdown per topic** con tabelle interattive
 - **Test connessioni** da UI con invio messaggi singoli/batch
 - **Health status** producer con indicatori visivi
+- **Consumer rapido** con origine offset (`latest`/`earliest`) e diagnostica "Info Topic"
+- **Stati chiari**: pulsante "Leggi Messaggi" abilitato solo dopo test connessione
+- **Suggerimenti topic**: datalist con topic di default (es. `PSTT.TEST-COLL`)
 
 ### API Kafka
 

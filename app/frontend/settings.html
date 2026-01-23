@@ -61,6 +61,48 @@
             </div>
                 </div>
                 <div class="section">
+            <h2 class="text-xl font-semibold text-gray-800 mb-3">Kafka</h2>
+            <div class="grid">
+                <label for="kafka_enabled">kafka_enabled</label>
+                <select id="kafka_enabled" class="border-gray-300">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                </select>
+                <span class="hint">Abilita integrazione Kafka (richiede riavvio).</span>
+
+                <label for="kafka_compression_type">kafka_compression_type</label>
+                <input id="kafka_compression_type" class="border-gray-300" placeholder="none|gzip|snappy|lz4|zstd" />
+
+                <label for="kafka_batch_size">kafka_batch_size</label>
+                <input id="kafka_batch_size" type="number" class="border-gray-300" placeholder="16384" />
+
+                <label for="kafka_linger_ms">kafka_linger_ms</label>
+                <input id="kafka_linger_ms" type="number" class="border-gray-300" placeholder="10" />
+
+                <label for="kafka_acks">kafka_acks</label>
+                <input id="kafka_acks" class="border-gray-300" placeholder="all|1|0" />
+
+                <label for="kafka_enable_idempotence">kafka_enable_idempotence</label>
+                <select id="kafka_enable_idempotence" class="border-gray-300">
+                    <option value="true">true</option>
+                    <option value="false">false</option>
+                </select>
+
+                <label for="kafka_max_in_flight_requests">kafka_max_in_flight_requests</label>
+                <input id="kafka_max_in_flight_requests" type="number" class="border-gray-300" placeholder="5" />
+
+                <label for="kafka_request_timeout_ms">kafka_request_timeout_ms</label>
+                <input id="kafka_request_timeout_ms" type="number" class="border-gray-300" placeholder="30000" />
+
+                <label for="kafka_default_topic">kafka_default_topic</label>
+                <input id="kafka_default_topic" class="border-gray-300" placeholder="pstt-traces-collaudo" />
+
+                <label for="kafka_message_batch_size">kafka_message_batch_size</label>
+                <input id="kafka_message_batch_size" type="number" class="border-gray-300" placeholder="100" />
+                <span class="hint">Default batch size per le esportazioni Kafka (UI). Il valore può essere sovrascritto per singola schedulazione.</span>
+            </div>
+                </div>
+                <div class="section">
             <h2 class="text-xl font-semibold text-gray-800 mb-3">SMTP</h2>
             <div class="grid">
                 <label for="smtp_host">smtp_host</label>
@@ -142,7 +184,11 @@
                 'smtp_host','smtp_port','smtp_user','smtp_password','smtp_from',
                 'daily_report_enabled','daily_report_cron','daily_reports_hour',
                 'daily_report_recipients','daily_report_cc','daily_report_subject','daily_report_tail_lines',
-                'scheduler_query_timeout_sec','scheduler_write_timeout_sec'
+                'scheduler_query_timeout_sec','scheduler_write_timeout_sec',
+                // Kafka
+                'kafka_enabled','kafka_compression_type','kafka_batch_size',
+                'kafka_linger_ms','kafka_acks','kafka_enable_idempotence','kafka_max_in_flight_requests',
+                'kafka_request_timeout_ms','kafka_default_topic','kafka_message_batch_size'
             ]) {
                 const el = document.getElementById(id);
                 if (el) payload[id] = el.value;

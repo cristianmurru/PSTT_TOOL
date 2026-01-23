@@ -53,12 +53,33 @@ class KafkaBatchPublishRequest(BaseModel):
     max_retries: int = Field(3, ge=1, le=10, description="Numero massimo retry")
 
 
+class KafkaConsumeRequest(BaseModel):
+    """Request per lettura veloce di messaggi da un topic"""
+    topic: str = Field(..., description="Topic Kafka da leggere")
+    connection_name: str = Field("default", description="Nome connessione Kafka")
+    max_messages: int = Field(50, ge=1, le=1000, description="Numero massimo di messaggi da leggere")
+    period: Optional[str] = Field(None, description="Facoltativo: 'latest' (default), 'earliest'")
+
+
+class KafkaConsumedMessage(BaseModel):
+    """Messaggio consumato per output UI"""
+    topic: str
+    partition: int
+    offset: int
+    timestamp: Optional[str] = None
+    key: Optional[str] = None
+    headers: Optional[List[Dict[str, str]]] = None
+    value_json: Optional[dict] = None
+    value_text: Optional[str] = None
+
+
 class KafkaConnectionInfo(BaseModel):
     """Info connessione Kafka"""
     name: str
     bootstrap_servers: str
     security_protocol: str
     sasl_mechanism: Optional[str] = None
+    environment: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -66,6 +87,39 @@ class KafkaConnectionsResponse(BaseModel):
     """Response lista connessioni Kafka"""
     connections: List[KafkaConnectionInfo]
     total: int
+
+
+class KafkaConnectionUpsert(BaseModel):
+    """Modello per creazione/aggiornamento profilo connessione Kafka (connections.json)"""
+    name: str
+    bootstrap_servers: str
+    security_protocol: str = Field("PLAINTEXT")
+    sasl_mechanism: Optional[str] = None
+    sasl_username: Optional[str] = None
+    sasl_password: Optional[str] = None
+    default_topic: Optional[str] = None
+    environment: Optional[str] = Field(None, description="Ambiente (es. collaudo, produzione, sviluppo)")
+    description: Optional[str] = None
+
+    @staticmethod
+    def _validate_bootstrap(servers: str) -> None:
+        parts = [s.strip() for s in servers.split(',') if s.strip()]
+        if not parts:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="bootstrap_servers non può essere vuoto")
+        for p in parts:
+            if ':' not in p:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Server malformato: {p} (atteso host:port)")
+
+    @classmethod
+    def validate(cls, payload: dict) -> "KafkaConnectionUpsert":
+        try:
+            item = KafkaConnectionUpsert(**payload)
+            cls._validate_bootstrap(item.bootstrap_servers)
+            return item
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 def get_kafka_connections() -> Dict[str, dict]:
@@ -115,6 +169,7 @@ async def list_kafka_connections():
                 bootstrap_servers=config.get('bootstrap_servers', ''),
                 security_protocol=config.get('security_protocol', 'PLAINTEXT'),
                 sasl_mechanism=config.get('sasl_mechanism'),
+                environment=config.get('environment'),
                 description=config.get('description')
             ))
         
@@ -131,6 +186,80 @@ async def list_kafka_connections():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.get("/connections/{name}", summary="Dettaglio connessione Kafka")
+async def get_connection_detail(name: str):
+    try:
+        all_cfg = get_kafka_connections()
+        if name not in all_cfg:
+            raise HTTPException(status_code=404, detail=f"Connessione '{name}' non trovata")
+        d = dict(all_cfg[name])
+        d['name'] = name
+        return d
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore dettaglio connessione Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/connections", summary="Crea/Aggiorna connessione Kafka")
+async def upsert_connection(payload: dict = Body(...)):
+    item = KafkaConnectionUpsert.validate(payload)
+    try:
+        path = Path("connections.json")
+        if not path.exists():
+            raise FileNotFoundError("connections.json non trovato")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        kc = data.get('kafka_connections') or {}
+        # scrivi entry
+        kc[item.name] = {
+            "name": item.name,
+            "bootstrap_servers": item.bootstrap_servers,
+            "security_protocol": item.security_protocol or "PLAINTEXT",
+            "sasl_mechanism": item.sasl_mechanism,
+            "sasl_username": item.sasl_username,
+            "sasl_password": item.sasl_password,
+            "default_topic": item.default_topic or data.get('kafka_default_topic'),
+            "environment": item.environment,
+            "description": item.description,
+        }
+        data['kafka_connections'] = kc
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Kafka connection upserted: {item.name}")
+        return {"success": True, "name": item.name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore salvataggio connessione Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/connections/{name}", summary="Elimina connessione Kafka")
+async def delete_connection(name: str):
+    try:
+        path = Path("connections.json")
+        if not path.exists():
+            raise FileNotFoundError("connections.json non trovato")
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        kc = data.get('kafka_connections') or {}
+        if name not in kc:
+            raise HTTPException(status_code=404, detail=f"Connessione '{name}' non trovata")
+        del kc[name]
+        data['kafka_connections'] = kc
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Kafka connection deleted: {name}")
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore eliminazione connessione Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/test-connection", response_model=KafkaHealthStatus, summary="Test connessione Kafka")
@@ -454,3 +583,192 @@ async def cleanup_old_metrics(days: int = 90):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+
+@router.post("/consume", summary="Consumo rapido ultimi N messaggi")
+async def consume_messages(request: KafkaConsumeRequest):
+    """
+    Consuma rapidamente gli ultimi N messaggi dal topic indicato.
+    - Non persiste stato di gruppo; lettura puntuale.
+    - Cerca di decodificare automaticamente JSON, con fallback a stringa.
+    """
+    try:
+        from kafka import KafkaConsumer, TopicPartition
+
+        # Carica configurazione connessione
+        conn_config = get_kafka_connection_config(request.connection_name)
+
+        # Costruisci kwargs sicurezza analoghi al producer
+        consumer_kwargs: Dict[str, Any] = {
+            "bootstrap_servers": conn_config.get_bootstrap_servers_list(),
+            "enable_auto_commit": False,
+            "auto_offset_reset": ("earliest" if (request.period or "latest").lower() == "earliest" else "latest"),
+            "consumer_timeout_ms": 3000,
+        }
+        if conn_config.security_protocol != "PLAINTEXT":
+            consumer_kwargs["security_protocol"] = conn_config.security_protocol
+            if conn_config.sasl_mechanism:
+                consumer_kwargs["sasl_mechanism"] = conn_config.sasl_mechanism
+            if conn_config.sasl_username:
+                consumer_kwargs["sasl_plain_username"] = conn_config.sasl_username
+            if conn_config.sasl_password:
+                consumer_kwargs["sasl_plain_password"] = conn_config.sasl_password
+            if "SSL" in str(conn_config.security_protocol):
+                if conn_config.ssl_cafile:
+                    consumer_kwargs["ssl_cafile"] = conn_config.ssl_cafile
+                if conn_config.ssl_certfile:
+                    consumer_kwargs["ssl_certfile"] = conn_config.ssl_certfile
+                if conn_config.ssl_keyfile:
+                    consumer_kwargs["ssl_keyfile"] = conn_config.ssl_keyfile
+
+        consumer = KafkaConsumer(**consumer_kwargs)
+
+        # Partizioni per topic
+        partitions = consumer.partitions_for_topic(request.topic)
+        if not partitions:
+            raise HTTPException(status_code=404, detail=f"Topic '{request.topic}' non trovato o senza partizioni")
+
+        tps = [TopicPartition(request.topic, p) for p in partitions]
+        consumer.assign(tps)
+
+        # Calcola offset di partenza per ogni partizione
+        per_part = max(1, (request.max_messages + len(tps) - 1) // len(tps))
+        end_offsets = consumer.end_offsets(tps)
+        begin_offsets = consumer.beginning_offsets(tps)
+        read_from_earliest = (request.period or "latest").lower() == "earliest"
+        for tp in tps:
+            end = end_offsets.get(tp, 0)
+            begin = begin_offsets.get(tp, 0)
+            start = begin if read_from_earliest else max(begin, end - per_part)
+            consumer.seek(tp, start)
+
+        # Leggi messaggi
+        messages: List[KafkaConsumedMessage] = []
+        total_limit = request.max_messages
+        while len(messages) < total_limit:
+            # prima chiamata non bloccante per inizializzare
+            if len(messages) == 0:
+                try:
+                    consumer.poll(timeout_ms=0)
+                except Exception:
+                    pass
+            batch = consumer.poll(timeout_ms=1200, max_records=total_limit - len(messages))
+            if not batch:
+                break
+            for tp, records in batch.items():
+                for msg in records:
+                    item = KafkaConsumedMessage(
+                        topic=msg.topic,
+                        partition=msg.partition,
+                        offset=msg.offset,
+                        timestamp=str(msg.timestamp) if msg.timestamp else None,
+                        key=(msg.key.decode("utf-8", errors="replace") if isinstance(msg.key, (bytes, bytearray)) else (str(msg.key) if msg.key is not None else None)),
+                        headers=[{h[0]: (h[1].decode("utf-8", errors="replace") if isinstance(h[1], (bytes, bytearray)) else str(h[1]))} for h in (msg.headers or [])] or None,
+                    )
+
+                    val_bytes = msg.value
+                    value_text = None
+                    value_json = None
+
+                    try:
+                        value_text = val_bytes.decode("utf-8") if isinstance(val_bytes, (bytes, bytearray)) else str(val_bytes)
+                        try:
+                            value_json = json.loads(value_text)
+                        except Exception:
+                            # Prova decompressione opzionale (snappy/lz4/zstd)
+                            try:
+                                import snappy  # type: ignore
+                                value_json = json.loads(snappy.decompress(val_bytes).decode("utf-8"))
+                            except Exception:
+                                try:
+                                    import lz4.frame  # type: ignore
+                                    value_json = json.loads(lz4.frame.decompress(val_bytes).decode("utf-8"))
+                                except Exception:
+                                    try:
+                                        import zstandard as zstd  # type: ignore
+                                        d = zstd.ZstdDecompressor()
+                                        value_json = json.loads(d.decompress(val_bytes).decode("utf-8"))
+                                    except Exception:
+                                        pass
+                    except Exception:
+                        value_text = None
+
+                    item.value_json = value_json
+                    item.value_text = value_text if value_json is None else None
+                    messages.append(item)
+                    if len(messages) >= total_limit:
+                        break
+                if len(messages) >= total_limit:
+                    break
+
+        try:
+            consumer.close()
+        except Exception:
+            pass
+
+        return {"count": len(messages), "messages": [m.model_dump(mode='json') for m in messages]}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore consumo rapido Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/topic-info/{topic}", summary="Info topic: partizioni e offset")
+async def topic_info(topic: str, connection_name: str = "default"):
+    """
+    Ritorna info diagnostiche sul topic: partizioni, beginning offset, end offset.
+    Utile per verificare che il topic esista e stimi il numero di messaggi presenti.
+    """
+    try:
+        from kafka import KafkaConsumer, TopicPartition
+
+        # Config connessione
+        conn_config = get_kafka_connection_config(connection_name)
+        consumer_kwargs: Dict[str, Any] = {
+            "bootstrap_servers": conn_config.get_bootstrap_servers_list(),
+            "enable_auto_commit": False,
+            "auto_offset_reset": "latest",
+            "consumer_timeout_ms": 2000,
+        }
+        if conn_config.security_protocol != "PLAINTEXT":
+            consumer_kwargs["security_protocol"] = conn_config.security_protocol
+            if conn_config.sasl_mechanism:
+                consumer_kwargs["sasl_mechanism"] = conn_config.sasl_mechanism
+            if conn_config.sasl_username:
+                consumer_kwargs["sasl_plain_username"] = conn_config.sasl_username
+            if conn_config.sasl_password:
+                consumer_kwargs["sasl_plain_password"] = conn_config.sasl_password
+
+        consumer = KafkaConsumer(**consumer_kwargs)
+        parts = consumer.partitions_for_topic(topic)
+        if not parts:
+            try:
+                consumer.close()
+            except Exception:
+                pass
+            raise HTTPException(status_code=404, detail=f"Topic '{topic}' non trovato o senza partizioni")
+
+        tps = [TopicPartition(topic, p) for p in parts]
+        begin = consumer.beginning_offsets(tps)
+        end = consumer.end_offsets(tps)
+        try:
+            consumer.close()
+        except Exception:
+            pass
+
+        items = []
+        total_estimate = 0
+        for tp in tps:
+            b = begin.get(tp, 0)
+            e = end.get(tp, 0)
+            total_estimate += max(0, e - b)
+            items.append({"partition": tp.partition, "begin_offset": b, "end_offset": e})
+
+        return {"topic": topic, "partitions": len(tps), "offsets": items, "estimated_messages": total_estimate}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore topic-info Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

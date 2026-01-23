@@ -153,6 +153,9 @@ Report_PSTT</textarea>
                         </div>
                         <!-- Campi Kafka (ADD form) -->
                         <div id="kafkaFieldsBox" style="display:none;">
+                            <label class="form-label">Connessione Kafka</label>
+                            <select class="form-input" name="kafka_connection" id="kafkaConnectionSelect"></select>
+
                             <label class="form-label">Topic Kafka</label>
                             <input type="text" class="form-input" name="kafka_topic" id="kafkaTopicInput" placeholder="pstt-data">
                             
@@ -278,6 +281,9 @@ Report_PSTT</textarea>
                         </div>
                         <!-- Campi Kafka (EDIT form) -->
                         <div id="editKafkaFieldsBox" style="display:none;">
+                            <label class="form-label">Connessione Kafka</label>
+                            <select class="form-input" name="kafka_connection" id="editKafkaConnectionSelect"></select>
+
                             <label class="form-label">Topic Kafka</label>
                             <input type="text" class="form-input" name="kafka_topic" id="editKafkaTopicInput" placeholder="pstt-data">
                             
@@ -419,6 +425,7 @@ select.form-input {
 let schedulingData = [];
 let connections = [];
 let queries = [];
+let kafkaConnections = [];
 
 function fetchConnections() {
     fetch('/api/connections/list')
@@ -440,6 +447,22 @@ function fetchQueries() {
             // popolamento rinviato ai cambi di connessione per filtrare le query disponibili
             updateQuerySelectByConnection('connectionSelect', 'querySelect');
             updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect');
+        });
+}
+
+function fetchKafkaConnections() {
+    fetch('/api/kafka/connections')
+        .then(r => r.json())
+        .then(data => {
+            kafkaConnections = (data && data.connections) ? data.connections : [];
+            const opts = kafkaConnections.map(k => `<option value="${k.name}">${k.name}</option>`).join('');
+            const addSel = document.getElementById('kafkaConnectionSelect');
+            const editSel = document.getElementById('editKafkaConnectionSelect');
+            if (addSel) addSel.innerHTML = opts;
+            if (editSel) editSel.innerHTML = opts;
+        })
+        .catch(() => {
+            // fail silent: leave selects empty
         });
 }
 
@@ -495,6 +518,7 @@ function showAddForm() {
     // assicura che i dropdown siano popolati e porta il focus al primo campo
     try { fetchConnections(); } catch(e){}
     try { fetchQueries(); } catch(e){}
+    try { fetchKafkaConnections(); } catch(e){}
     setTimeout(() => {
         const addFormEl = document.getElementById('add-form');
         if (addFormEl) addFormEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -512,6 +536,7 @@ function hideAddForm() {
 function showEditForm(idx) {
     fetchConnections();
     fetchQueries();
+    fetchKafkaConnections();
     setTimeout(() => {
         const s = schedulingData[idx];
         document.getElementById('editQuerySelect').value = s.query;
@@ -564,11 +589,17 @@ function showEditForm(idx) {
     toggleFieldsForMode(document.getElementById('form-edit-schedule'), schedMode);
     const editCronEl = document.querySelector('#edit-form input[name="cron_expression"]');
     if (editCronEl) editCronEl.disabled = schedMode !== 'cron';
-        // ensure sharing box visibility reflects current value immediately
+        // ensure sharing box visibility reflects current value immediately (including Kafka)
         const editSharingMode = document.getElementById('editSharingModeSelect');
+                // Kafka: prefill connection if present
+                const editKafkaConnSel = document.getElementById('editKafkaConnectionSelect');
+                if (editKafkaConnSel && s.kafka_connection) {
+                    editKafkaConnSel.value = s.kafka_connection;
+                }
         const editEmailBox = document.getElementById('editEmailFieldsBox');
         const editOutputDirBox = document.getElementById('editOutputDirBox');
-        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
+        const editKafkaBox = document.getElementById('editKafkaFieldsBox');
+        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox, editKafkaBox);
         if (editSharingMode && editSharingMode.value === 'email') {
             if (editEmailSubject && !editEmailSubject.value) editEmailSubject.value = DEFAULT_SUBJECT;
             if (editEmailBody && !editEmailBody.value) editEmailBody.value = DEFAULT_BODY;
@@ -610,11 +641,23 @@ function toggleFieldsForMode(form, mode) {
     if (minuteEl) { minuteEl.disabled = isCron; const wrap = minuteEl.closest('.flex-1'); if (wrap) wrap.classList.toggle('field-disabled', isCron); }
 }
 
-// helper to show/hide email vs filesystem boxes based on sharing mode (available globally)
-function applySharingBoxVisibility(selectEl, emailBoxEl, dirBoxEl) {
+// helper to show/hide email vs filesystem vs kafka boxes based on sharing mode (available globally)
+function applySharingBoxVisibility(selectEl, emailBoxEl, dirBoxEl, kafkaBoxEl) {
     if (!selectEl || !emailBoxEl || !dirBoxEl) return;
-    if (selectEl.value === 'email') { emailBoxEl.style.display = 'block'; dirBoxEl.style.display = 'none'; }
-    else { emailBoxEl.style.display = 'none'; dirBoxEl.style.display = 'block'; }
+    const mode = selectEl.value;
+    if (mode === 'email') {
+        emailBoxEl.style.display = 'block';
+        dirBoxEl.style.display = 'none';
+        if (kafkaBoxEl) kafkaBoxEl.style.display = 'none';
+    } else if (mode === 'kafka') {
+        if (kafkaBoxEl) kafkaBoxEl.style.display = 'block';
+        emailBoxEl.style.display = 'none';
+        dirBoxEl.style.display = 'none';
+    } else {
+        emailBoxEl.style.display = 'none';
+        if (kafkaBoxEl) kafkaBoxEl.style.display = 'none';
+        dirBoxEl.style.display = 'block';
+    }
 }
 
 // convert dd/mm/yyyy to yyyy-mm-dd (ISO) or return undefined if empty/invalid
@@ -717,8 +760,8 @@ function setupFormToggles() {
         const addCronInput = cronBox ? cronBox.querySelector('[name="cron_expression"]') : null;
         if (addCronInput) addCronInput.disabled = mode !== 'cron';
         adjustSchedulingSelectWidth(schedulingMode, mode);
-        // initialize sharing visibility for add form
-        applySharingBoxVisibility(sharingMode, emailBox, outputDirBox);
+        // initialize sharing visibility for add form (including Kafka)
+        applySharingBoxVisibility(sharingMode, emailBox, outputDirBox, kafkaBox);
         // bind dinamico: quando cambia connessione, filtra le query
         document.getElementById('connectionSelect')?.addEventListener('change', () => {
             updateQuerySelectByConnection('connectionSelect', 'querySelect');
@@ -730,8 +773,8 @@ function setupFormToggles() {
         const editCronInputInit = editCronBox ? editCronBox.querySelector('[name="cron_expression"]') : null;
         if (editCronInputInit) editCronInputInit.disabled = mode !== 'cron';
         adjustSchedulingSelectWidth(editSchedulingMode, mode);
-        // initialize sharing visibility for edit form
-        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox);
+        // initialize sharing visibility for edit form (including Kafka)
+        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox, editKafkaBox);
         // bind dinamico: quando cambia connessione (edit), filtra le query
         document.getElementById('editConnectionSelect')?.addEventListener('change', () => {
             updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect');
@@ -840,15 +883,13 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
     
-    // Add Kafka configuration if Kafka mode is selected
+    // Add Kafka fields (top-level) if Kafka mode is selected
     if (sharingMode === 'kafka') {
-        data.kafka_config = {
-            enabled: true,
-            topic: form.kafka_topic ? form.kafka_topic.value : 'pstt-traces',
-            message_key_field: form.kafka_key_field ? form.kafka_key_field.value || null : null,
-            batch_size: form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100,
-            include_metadata: form.kafka_include_metadata ? form.kafka_include_metadata.checked : true
-        };
+        data.kafka_topic = form.kafka_topic ? form.kafka_topic.value : 'pstt-traces';
+        data.kafka_key_field = form.kafka_key_field ? (form.kafka_key_field.value || null) : null;
+        data.kafka_batch_size = form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100;
+        data.kafka_include_metadata = form.kafka_include_metadata ? form.kafka_include_metadata.checked : true;
+        data.kafka_connection = form.kafka_connection ? (form.kafka_connection.value || 'default') : 'default';
     }
     
     fetch('/api/scheduler/scheduling', {
@@ -892,15 +933,13 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         email_body: form.email_body ? form.email_body.value || undefined : undefined
     };
     
-    // Add Kafka configuration if Kafka mode is selected
+    // Add Kafka fields (top-level) if Kafka mode is selected
     if (sharingMode === 'kafka') {
-        data.kafka_config = {
-            enabled: true,
-            topic: form.kafka_topic ? form.kafka_topic.value : 'pstt-traces',
-            message_key_field: form.kafka_key_field ? form.kafka_key_field.value || null : null,
-            batch_size: form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100,
-            include_metadata: form.kafka_include_metadata ? form.kafka_include_metadata.checked : true
-        };
+        data.kafka_topic = form.kafka_topic ? form.kafka_topic.value : 'pstt-traces';
+        data.kafka_key_field = form.kafka_key_field ? (form.kafka_key_field.value || null) : null;
+        data.kafka_batch_size = form.kafka_batch_size ? parseInt(form.kafka_batch_size.value) : 100;
+        data.kafka_include_metadata = form.kafka_include_metadata ? form.kafka_include_metadata.checked : true;
+        data.kafka_connection = form.kafka_connection ? (form.kafka_connection.value || 'default') : 'default';
     }
     
     fetch(`/api/scheduler/scheduling/${idx}`, {
@@ -1097,13 +1136,23 @@ function updateQuerySelectByConnection(connSelectId, querySelectId, preferredVal
     const connSelect = document.getElementById(connSelectId);
     const querySelect = document.getElementById(querySelectId);
     if (!connSelect || !querySelect) return;
-    const filtered = filterQueriesForConnection(connSelect.value);
-    const optionsHtml = filtered.map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
-    querySelect.innerHTML = optionsHtml || (queries || []).map(q => `<option value="${q.filename}">${q.filename}</option>`).join('');
-    // ripristina la selezione se disponibile
-    if (preferredValue) {
+    const previous = querySelect.value;
+    const filtered = filterQueriesForConnection(connSelect.value) || [];
+    const all = (queries || []).map(q => q.filename);
+    let baseList = filtered.length ? filtered.map(q => q.filename) : all.slice();
+    // if a preferred value is provided and it's not in the filtered list, include it to preserve selection
+    if (preferredValue && !baseList.includes(preferredValue)) {
+        baseList = [preferredValue, ...baseList];
+    }
+    const optionsHtml = baseList.map(fn => `<option value="${fn}">${fn}</option>`).join('');
+    querySelect.innerHTML = optionsHtml;
+    const available = new Set(baseList);
+    // restore selection priority: preferredValue -> previous -> first filtered
+    if (preferredValue && available.has(preferredValue)) {
         querySelect.value = preferredValue;
-    } else if (!querySelect.value && filtered.length) {
+    } else if (previous && available.has(previous)) {
+        querySelect.value = previous;
+    } else if (filtered.length) {
         querySelect.value = filtered[0].filename;
     }
 }
