@@ -10,6 +10,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from loguru import logger
 import mimetypes
+import os
+import re
 
 from app.core.config import setup_logging, get_settings, get_connections_config
 from app.services.connection_service import ConnectionService
@@ -132,6 +134,83 @@ async def kafka_dashboard(request: Request):
         
     except Exception as e:
         logger.error(f"Errore nel Kafka dashboard: {e}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+
+@app.get("/docs/readme", response_class=HTMLResponse, name="readme_page")
+async def readme_page(request: Request):
+    """Visualizza README.md come pagina HTML"""
+    try:
+        # Preferisce README.md in root; fallback a docs/README.md
+        root_path = settings.base_dir / "README.md"
+        alt_path = settings.base_dir / "docs" / "README.md"
+        file_path = root_path if root_path.exists() else alt_path
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="README non trovato")
+        md_text = file_path.read_text(encoding="utf-8")
+        return templates.TemplateResponse(
+            "markdown_viewer.html",
+            {
+                "request": request,
+                "title": "README",
+                "md_content": md_text,
+                "app_name": settings.app_name,
+                "app_version": settings.app_version,
+                "doc_version": None,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore nel rendering README: {e}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+
+@app.get("/docs/changelog", response_class=HTMLResponse, name="changelog_page")
+async def changelog_page(request: Request):
+    """Visualizza CHANGELOG.md come pagina HTML"""
+    try:
+        # Preferisce CHANGELOG.md in root; fallback ad eventuale docs/CHANGELOG.md
+        root_path = settings.base_dir / "CHANGELOG.md"
+        alt_path = settings.base_dir / "docs" / "CHANGELOG.md"
+        file_path = root_path if root_path.exists() else alt_path
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="CHANGELOG non trovato")
+        md_text = file_path.read_text(encoding="utf-8")
+
+        # Evidenzia e uniforma i titoli release (come H2) con spacing
+        # Cattura sia linee già con '## ' sia linee senza prefisso
+        pattern = r"^\s*(?:##\s*)?\[(\d+\.\d+\.\d+)\]\s*-\s*\[(\d{4}-\d{2}-\d{2})\]\s*-\s*(.+)$"
+        def repl(m: re.Match) -> str:
+            ver, date, title = m.group(1), m.group(2), m.group(3)
+            return f"\n\n## [{ver}] - [{date}] - {title}\n\n"
+        md_text_transformed = re.sub(pattern, repl, md_text, flags=re.MULTILINE)
+
+        # Estrae la versione più recente
+        doc_version = None
+        mver = re.search(r"^##\s*\[(?P<ver>\d+\.\d+\.\d+)\]", md_text, flags=re.MULTILINE)
+        if mver:
+            doc_version = mver.group("ver")
+        else:
+            mver2 = re.search(r"^\[(?P<ver>\d+\.\d+\.\d+)\]\s*-\s*\[\d{4}-\d{2}-\d{2}\]", md_text, flags=re.MULTILINE)
+            if mver2:
+                doc_version = mver2.group("ver")
+
+        return templates.TemplateResponse(
+            "markdown_viewer.html",
+            {
+                "request": request,
+                "title": "CHANGELOG",
+                "md_content": md_text_transformed,
+                "app_name": settings.app_name,
+                "app_version": settings.app_version,
+                "doc_version": doc_version,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore nel rendering CHANGELOG: {e}")
         raise HTTPException(status_code=500, detail="Errore interno del server")
 
 

@@ -344,8 +344,8 @@
       "days_of_week": [
         4
       ],
-      "hour": 12,
-      "minute": 45,
+      "hour": 17,
+      "minute": 21,
       "second": null,
       "cron_expression": null,
       "end_date": "2026-01-24",

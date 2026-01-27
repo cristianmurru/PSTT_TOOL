@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kafka Dashboard - {{ app_name }} v{{ app_version }}</title>
+    <title>Kafka Dashboard - {{ app_name }}</title>
     
     <!-- Tailwind CSS -->
     <script src="/static/css/tailwind.min.js"></script>
@@ -41,7 +41,6 @@
                     <div class="flex items-center">
                         <i class="fas fa-database text-blue-600 text-2xl mr-3"></i>
                         <span class="font-bold text-xl text-gray-900">{{ app_name }}</span>
-                        <span class="text-sm text-gray-500 ml-2">v{{ app_version }}</span>
                     </div>
                     <div class="flex items-center space-x-4">
                         <a href="/" class="text-blue-600 hover:underline text-sm">
@@ -56,6 +55,16 @@
                         <a href="/settings" class="text-blue-600 hover:underline text-sm">
                             <i class="fas fa-gear mr-1"></i>Impostazioni
                         </a>
+                        <!-- Help Menu -->
+                        <div class="relative">
+                            <button id="helpMenuBtn" class="text-blue-600 hover:underline text-sm px-2 py-1 cursor-pointer" aria-label="Guida">
+                                <i class="fas fa-question-circle"></i>
+                            </button>
+                            <div id="helpDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                <a href="/docs/readme" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">README</a>
+                                <a href="/docs/changelog" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CHANGELOG</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -316,7 +325,10 @@
                     <h2 class="text-lg font-semibold text-gray-900 mb-1">
                         <i class="fas fa-download mr-2"></i>Consumer Rapido
                     </h2>
-                    <p class="text-xs text-gray-500 mb-3">Connessione selezionata: <span id="consumerSelectedConn">Nessuna</span> — scegli la connessione nel pannello sopra.</p>
+                    <p class="mb-3 text-sm">
+                        <span>Connessione selezionata: <span id="consumerSelectedConn">Nessuna</span></span>
+                        <span id="consumerHint" class="ml-1"> — seleziona la connessione nel pannello Gestione Connessioni Kafka</span>
+                    </p>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Topic</label>
@@ -361,6 +373,10 @@
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">
                         <i class="fas fa-edit mr-2"></i>Pubblica Messaggio (Debug/Test)
                     </h2>
+                    <p class="mb-3 text-sm">
+                        <span>Connessione selezionata: <span id="publishSelectedConn">Nessuna</span></span>
+                        <span id="publishConnHint" class="ml-1 hidden"> — seleziona la connessione nel pannello Gestione Connessioni Kafka</span>
+                    </p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div>
@@ -392,6 +408,10 @@
                     <h2 class="text-lg font-semibold text-gray-900 mb-4">
                         <i class="fas fa-layer-group mr-2"></i>Pubblicazione Batch
                     </h2>
+                    <p class="mb-3 text-sm">
+                        <span>Connessione selezionata: <span id="batchSelectedConn">Nessuna</span></span>
+                        <span id="batchConnHint" class="ml-1 hidden"> — seleziona la connessione nel pannello Gestione Connessioni Kafka</span>
+                    </p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                         <div>
@@ -426,8 +446,8 @@
                     </button>
                     
                     <!-- Batch Result -->
-                    <div id="batchResult" class="mt-4 hidden">
-                            <button id="mcNewBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition"><i class="fas fa-file mr-2"></i>Nuovo</button>
+                        <div id="batchResult" class="mt-4 hidden">
+                            <button id="batchNewBtn" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition" title="Azzera e prepara un nuovo batch"><i class="fas fa-file mr-2"></i>Nuovo</button>
                             <h4 class="text-sm font-medium text-blue-900 mb-2">Risultato Batch</h4>
                             <div class="grid grid-cols-3 gap-4 text-sm">
                                 <div>
@@ -617,9 +637,20 @@
         function updateConsumerStateFromSelection() {
             const sel = document.getElementById('kafkaConnectionSelect');
             const name = sel ? sel.value : '';
-            const label = document.getElementById('consumerSelectedConn');
             const btn = document.getElementById('consumeBtn');
-            if (label) label.textContent = name || 'Nessuna';
+            // update selected connection labels across panels
+            ['consumerSelectedConn','publishSelectedConn','batchSelectedConn'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = name || 'Nessuna';
+            });
+            // show/hide connection selection hints across panels
+            ['consumerHint','publishConnHint','batchConnHint'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    // hide hint once a connection is selected
+                    if (name) el.classList.add('hidden'); else el.classList.remove('hidden');
+                }
+            });
             if (btn) {
                 const disabled = (!name || !kafkaConnected);
                 btn.disabled = disabled;
@@ -897,19 +928,24 @@
                 });
                 
                 const data = await response.json();
-                
-                if (data.success) {
-                    showToast(`Batch inviato: ${data.successful}/${data.total} messaggi`, 'success');
-                    
+
+                if (response.ok) {
+                    const total = (data.total ?? 0);
+                    const succeeded = (data.succeeded ?? data.successful ?? 0);
+                    const failed = (data.failed ?? 0);
+                    const toastType = failed === 0 ? 'success' : 'warning';
+                    showToast(`Batch inviato: ${succeeded}/${total} messaggi`, toastType);
+
                     // Show batch result
                     document.getElementById('batchResult').classList.remove('hidden');
-                    document.getElementById('batchTotal').textContent = data.total;
-                    document.getElementById('batchSuccess').textContent = data.successful;
-                    document.getElementById('batchErrors').textContent = data.failed;
-                    
+                    document.getElementById('batchTotal').textContent = total;
+                    document.getElementById('batchSuccess').textContent = succeeded;
+                    document.getElementById('batchErrors').textContent = failed;
+
                     loadMetrics(); // Refresh metrics
                 } else {
-                    showToast('Errore nell\'invio batch: ' + data.error, 'error');
+                    const errDetail = data?.detail || (Array.isArray(data?.errors) ? data.errors[0] : undefined) || response.statusText || 'Errore sconosciuto';
+                    showToast('Errore nell\'invio batch: ' + errDetail, 'error');
                 }
             } catch (error) {
                 showToast('Errore: ' + error.message, 'error');
@@ -1000,6 +1036,25 @@
         document.getElementById('publishBatchBtn').addEventListener('click', publishBatch);
         document.getElementById('consumeBtn').addEventListener('click', consumeMessages);
         document.getElementById('topicInfoBtn').addEventListener('click', showTopicInfo);
+        // Reset batch panel
+        function resetBatchPanel(){
+            try{
+                const topicEl = document.getElementById('batchTopic');
+                const messagesEl = document.getElementById('batchMessages');
+                const sizeEl = document.getElementById('batchSize');
+                const retriesEl = document.getElementById('batchRetries');
+                if (messagesEl) messagesEl.value = '';
+                if (topicEl && topicEl.placeholder) topicEl.value = topicEl.placeholder; else if (topicEl) topicEl.value = '';
+                if (sizeEl) sizeEl.value = (sizeEl.getAttribute('value') || '100');
+                if (retriesEl) retriesEl.value = (retriesEl.getAttribute('value') || '3');
+                document.getElementById('batchTotal').textContent = '0';
+                document.getElementById('batchSuccess').textContent = '0';
+                document.getElementById('batchErrors').textContent = '0';
+                document.getElementById('batchResult').classList.add('hidden');
+                showToast('Pannello batch azzerato', 'info');
+            } catch(e) {}
+        }
+        document.getElementById('batchNewBtn').addEventListener('click', resetBatchPanel);
         
         // Period filter UI (simple select added dynamically near breakdown header)
         (function addPeriodSelector(){
@@ -1027,6 +1082,25 @@
                 updateConsumerStateFromSelection();
                 // Carica metriche iniziali
                 loadMetrics('today');
+    </script>
+    <script>
+    // Help menu toggle for Kafka navbar
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('helpMenuBtn');
+        const dd = document.getElementById('helpDropdown');
+        if (btn && dd) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dd.classList.toggle('hidden');
+            });
+            document.addEventListener('click', () => {
+                if (!dd.classList.contains('hidden')) dd.classList.add('hidden');
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') dd.classList.add('hidden');
+            });
+        }
+    });
     </script>
 </body>
 </html>
