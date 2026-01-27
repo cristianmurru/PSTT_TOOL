@@ -41,9 +41,19 @@
                     </div>
                     <div class="flex items-center gap-4">
                         <a href="/" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf015;</span>Home</a>
-                        <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><i class="fas fa-calendar-alt mr-1"></i>Schedulazioni</a>
+                        <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf073;</span>Schedulazioni</a>
                         <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
-                        <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
+                        <a href="/logs" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf15c;</span>Log</a>
+                        <!-- Help Menu -->
+                        <div class="relative">
+                            <button id="helpMenuBtn" class="text-blue-600 hover:underline text-sm px-2 py-1 cursor-pointer" aria-label="Guida">
+                                <span class="fa-inline" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf059;</span>
+                            </button>
+                            <div id="helpDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                <a href="/docs/readme" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">README</a>
+                                <a href="/docs/changelog" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CHANGELOG</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -303,6 +313,21 @@
         document.getElementById('saveBtn').addEventListener('click', saveSettings);
         document.getElementById('restartBtn').addEventListener('click', restartApp);
         loadSettings();
+        // Help menu toggle
+        const btn = document.getElementById('helpMenuBtn');
+        const dd = document.getElementById('helpDropdown');
+        if (btn && dd) {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                dd.classList.toggle('hidden');
+            });
+            document.addEventListener('click', () => {
+                if (!dd.classList.contains('hidden')) dd.classList.add('hidden');
+            });
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') dd.classList.add('hidden');
+            });
+        }
     </script>
 </body>
 </html>

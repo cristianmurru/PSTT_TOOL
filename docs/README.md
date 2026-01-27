@@ -229,6 +229,12 @@ Regole operative:
    - Export Excel/CSV
 5. **Barra Stato**: Mostra connessione, query, numero righe, tempo esecuzione
 
+### Aiuto e Documentazione
+- **Icona "?" in navbar** su tutte le pagine apre un menu rapido con:
+   - **README**: `GET /docs/readme` (fallback automatico a `docs/README.md` se non presente altrove)
+   - **CHANGELOG**: `GET /docs/changelog` con normalizzazione headings/spaziatura
+- **Viewer Markdown**: stile GitHub, ricerca parola chiave, evidenziazione codice, embedding JSON sicuro per evitare problemi di parsing.
+
 ### Scorciatoie Tastiera
 
 - `Ctrl + Enter`: Esegui query selezionata

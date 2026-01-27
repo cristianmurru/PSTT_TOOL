@@ -42,13 +42,22 @@
                     <div class="flex items-center">
                         <i class="fas fa-database text-blue-600 text-2xl mr-3"></i>
                         <span class="font-bold text-xl text-gray-900">{{ app_name }}</span>
-                        <span class="text-sm text-gray-500 ml-2">v{{ app_version }}</span>
                     </div>
                     <div class="flex items-center space-x-4">
                         <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><i class="fas fa-calendar-alt mr-1"></i>Schedulazioni</a>
                         <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
                         <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
                         <a href="/settings" class="text-blue-600 hover:underline text-sm"><i class="fas fa-gear mr-1"></i>Impostazioni</a>
+                        <!-- Help Menu -->
+                        <div class="relative">
+                            <button id="helpMenuBtn" class="text-blue-600 hover:underline text-sm px-2 py-1 cursor-pointer" aria-label="Guida">
+                                <i class="fas fa-question-circle"></i>
+                            </button>
+                            <div id="helpDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                <a href="/docs/readme" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">README</a>
+                                <a href="/docs/changelog" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CHANGELOG</a>
+                            </div>
+                        </div>
                         <!-- Connection Selector -->
                         <div class="flex items-center space-x-2">
                             <i class="fas fa-server text-gray-500"></i>
@@ -268,5 +277,20 @@
 
     <!-- JavaScript -->
     <script src="/static/js/main.js?v={{ app_version }}"></script>
+    <script>
+        // Help Menu toggle
+        (function() {
+            const btn = document.getElementById('helpMenuBtn');
+            const dd = document.getElementById('helpDropdown');
+            if (!btn || !dd) return;
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                dd.classList.toggle('hidden');
+            });
+            document.addEventListener('click', function() {
+                if (!dd.classList.contains('hidden')) dd.classList.add('hidden');
+            });
+        })();
+    </script>
 </body>
 </html>

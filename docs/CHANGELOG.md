@@ -7,18 +7,40 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.1] - [2026-01-27] - Menu Aiuto, Viewer Markdown, fix Kafka fields, storico chiarito
+
+### Added
+- ❓ **Menu Aiuto in tutte le pagine**: aggiunto un'icona "?" in navbar con collegamenti rapidi a README e CHANGELOG.
+- 📰 **Viewer Markdown**: nuova pagina di visualizzazione documentazione con stile GitHub-like, evidenziazione sintassi, embedding JSON sicuro e ricerca per parola chiave.
+- 📚 **Route Documentazione**: `GET /docs/readme` (fallback automatico su `docs/README.md`) e `GET /docs/changelog` (normalizzazione headings e spaziatura per migliore leggibilità).
+
+### Changed
+- 🎛️ **Navbar pulita**: rimossa label versione evidenziata; icone uniformate (colorazione coerente con i link).
+- 🕒 **Storico scheduler più chiaro**: i timeout di query e scrittura vengono registrati con messaggi espliciti; UI semplificata (rimosse badge e testo extra) mantenendo solo informazioni essenziali.
+
+### Fixed
+- 🧩 **Caricamento pagina Scheduler**: eliminato frammento template errato che causava errore JS e impediva il rendering.
+- 🔧 **Kafka (edit schedulazioni)**: ripristinata corretta precompilazione e persistenza di `kafka_topic` e `kafka_key_field` nelle form di modifica; evitato overwrite con default.
+- 🟦 **Toggle menu Aiuto**: script di apertura/chiusura corretti e uniformati su Scheduler, Log e Impostazioni.
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### File toccati (principali)
+- Frontend: `app/templates/index.html`, `app/frontend/scheduler_dashboard.html`, `app/frontend/logs.html`, `app/frontend/settings.html`, `app/templates/kafka_dashboard.html`, `app/templates/markdown_viewer.html`.
+- Backend/API: `app/main.py` (route docs), `app/api/scheduler.py` (storico, add/put schedulazioni), `app/services/scheduler_service.py` (tracking timeout, export_mode).
+- Documentazione: `docs/README.md`, `docs/CHANGELOG.md`.
+
 ## [1.1.0] - [2026-01-21] - Integrazione completa Kafka per pubblicazione messaggi su topic da schedulazioni
 
 ### Added - Kafka Integration (STEP 1-7/8)
 
 #### STEP 1-2: Foundation & Service ✅
-- 🚀 **Kafka Integration Foundation**
   - Dipendenze: `kafka-python-ng==2.2.2` e `aiokafka==0.10.0`
   - Modelli Pydantic completi (`app/models/kafka.py`): `KafkaConnectionConfig`, `KafkaProducerConfig`, `KafkaExportConfig`, `KafkaMetrics`, `BatchResult`, `KafkaHealthStatus`
   - 36 nuove variabili configurazione in `app/core/config.py`
   - Supporto multi-cluster Kafka in `connections.json`
   - Helper `get_kafka_config()` per caricamento configurazione
-- 📡 **KafkaService Implementation** (`app/services/kafka_service.py`)
   - Connection management asincrona con security (PLAINTEXT/SSL/SASL)
   - Message publishing singolo con retry automatico
   - JSON serialization custom per `datetime`, `date`, `Decimal`
@@ -28,7 +50,6 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   - Context manager per gestione automatica risorse
 
 #### STEP 3: Batch Publishing & Performance ✅
-- ⚡ **Batch Publishing Optimization**
   - `send_batch()`: Invio batch con chunking intelligente (default 100 msg/chunk)
   - Processing parallelo messaggi con `asyncio.to_thread`
   - Flush periodico buffer ogni 10 chunk
@@ -39,7 +60,6 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   - Backoff: 100ms → 200ms → 400ms (max 3 retry)
 
 #### STEP 4: Scheduler Integration ✅
-- 🔗 **Scheduler Kafka Export**
   - Estensione `SchedulingItem`: `SharingMode.KAFKA`, campi `kafka_topic`, `kafka_key_field`, `kafka_batch_size`, `kafka_include_metadata`
   - Metodo `_execute_kafka_export()` in `SchedulerService`
   - Pipeline: query → trasformazione → batch export Kafka
@@ -47,7 +67,6 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   - Tracking completo in `scheduler_history.json`: kafka_topic, kafka_messages_sent, kafka_messages_failed, kafka_duration_sec
 
 #### STEP 5: API & Metrics ✅
-- 📊 **Kafka API Endpoints** (`app/api/kafka.py`)
   - `POST /api/kafka/test`: Test connessione broker
   - `POST /api/kafka/send`: Invio messaggio singolo
   - `POST /api/kafka/batch`: Invio batch messaggi
@@ -55,56 +74,43 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
   - `GET /api/kafka/metrics/hourly`: Metriche ultime 24h
   - `GET /api/kafka/metrics/topics`: Breakdown per topic
   - `GET /api/kafka/health`: Health check producer Kafka
-- 📈 **Metrics Service** (`app/services/kafka_metrics.py`)
   - Tracciamento temporale con granularità oraria
   - Aggregazione multi-dimensionale (topic, connection, total)
   - Export JSON persistente su disco
   - Reset metriche manuale e automatico
 
 #### STEP 6: UI & Dashboard ✅
-- 🎨 **Kafka Dashboard** (`app/frontend/kafka_dashboard.html`)
   - Overview metriche in tempo reale (last 24h)
   - Grafici throughput e latency con Chart.js
   - Breakdown per topic con tabelle interattive
   - Sezione test: invio messaggi singoli/batch da UI
   - Health status producer con indicatori visivi
-- 🔧 **Scheduler UI Enhancement** (`app/frontend/scheduler_dashboard.html`)
   - Opzione "Kafka" in dropdown Condivisione
   - 4 campi specifici: kafka_topic, kafka_key_field, kafka_batch_size, kafka_include_metadata
   - Show/hide dinamico campi in base a modalità selezionata
   - Form submission con costruzione automatica `kafka_config` object
 
 #### STEP 7: Documentation & Testing ✅
-- 📚 **Comprehensive Documentation**
   - `docs/KAFKA_SETUP.md` (~400 righe): Setup guide, troubleshooting, performance tuning, security SSL/SASL, FAQ
   - `docs/KAFKA_RUNBOOK.md` (~600 righe): Operational procedures, emergency scenarios, health checks, escalation matrix
-- 🛠️ **Benchmark Tool** (`tools/kafka_benchmark.py`)
   - 3 modalità test: single, batch, mixed load
   - Metriche latenza: avg, p50, p90, p99
   - Calcolo throughput (msg/sec)
   - Command-line interface con argparse
-- ✅ **Test Coverage**
   - 111 test passed (pytest)
   - Coverage: 76% overall (kafka_service: 75%, metrics: 88%, api: 68%)
   - Test validazione modelli, service methods, API endpoints, scheduler integration
 
 ### Technical Details
-- **Security**: PLAINTEXT/SSL/SASL_PLAINTEXT/SASL_SSL con meccanismi PLAIN/SCRAM
-- **Performance**: Snappy compression, batching, idempotence, throughput >100 msg/sec
-- **Reliability**: Retry automatico, backoff esponenziale, success rate monitoring 95%
-- **Architecture**: Completamente asincrona (async/await), compatibile FastAPI
-- **Multi-cluster**: Supporto connessioni multiple via `connections.json`
-- **Zero Breaking Changes**: Tutte le funzionalità esistenti rimangono intatte
 
 ### Next Steps
-- STEP 8: Deploy produzione e rollout graduale
   - Pre-deploy checklist (credentials, network, topics)
   - Deploy Phase 1: Infrastructure setup
   - Deploy Phase 2: Test in production (1 job, monitor 1 week)
   - Deploy Phase 3: Gradual rollout (20K+ msg/day)
   - Post-deploy monitoring e weekly reviews
 
----
+
 
 ## [1.0.4] - [2026-01-17] - Service restart reliability multi-strategy
 

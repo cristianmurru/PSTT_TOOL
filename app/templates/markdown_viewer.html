@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="it" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }} - {{ app_name }}</title>
+    <!-- Tailwind CSS -->
+    <script src="/static/css/tailwind.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- GitHub-like Markdown CSS for readability -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown.min.css" integrity="sha512-B9t3PCKw3N1q7EwUjZyYwIx9ZP+gE2x4k3m6FhKlY8cFVVfQ3Q3JrKQn1dHq0XqP0y0kY0bIuWNb+oQ0i3QJqg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+        <style>
+            /* Local heading and spacing tweaks to improve readability even without CDN CSS */
+            .markdown-body h1 { font-size: 1.8rem; font-weight: 700; margin: 1rem 0 0.75rem; }
+            .markdown-body h2 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.75rem; }
+            .markdown-body h3 { font-size: 1.25rem; font-weight: 600; margin: 0.9rem 0 0.6rem; }
+            .markdown-body p, .markdown-body ul, .markdown-body ol { margin: 0.4rem 0 0.8rem; }
+            .markdown-body pre { background:#f6f8fa; border-radius:6px; padding:12px; overflow:auto; }
+            .markdown-body code { background:#f6f8fa; border-radius:4px; padding:0.1rem 0.3rem; }
+            .markdown-body hr { border:0; height:1px; background:#e5e7eb; margin:1rem 0; }
+            /* Highlight marks */
+            mark.bg-yellow-200 { background:#fde68a; padding:0 2px; }
+        </style>
+    <!-- Highlight.js for code blocks -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Mark.js for keyword highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mark.js/8.11.1/mark.min.js"></script>
+</head>
+<body class="h-full">
+    <div class="min-h-full">
+        <!-- Navigation Header -->
+        <nav class="bg-white shadow-lg border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-database text-blue-600 text-2xl mr-3"></i>
+                        <span class="font-bold text-xl text-gray-900">{{ app_name }}</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <a href="/" class="text-blue-600 hover:underline text-sm"><i class="fas fa-home mr-1"></i>Home</a>
+                        <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><i class="fas fa-calendar-alt mr-1"></i>Schedulazioni</a>
+                        <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
+                        <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
+                        <a href="/settings" class="text-blue-600 hover:underline text-sm"><i class="fas fa-gear mr-1"></i>Impostazioni</a>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h1 class="text-xl font-semibold text-gray-900"><i class="fas fa-book mr-2"></i>{{ title }}</h1>
+                    {% if doc_version %}
+                    <div class="text-sm text-gray-500">Aggiornato con v{{ doc_version }}</div>
+                    {% endif %}
+                </div>
+                <!-- Search bar -->
+                <div class="flex items-center gap-2 mb-4">
+                    <input id="searchInput" type="text" placeholder="Cerca parola chiave..." class="border border-gray-300 rounded-md px-3 py-2 w-72 text-sm" />
+                    <button id="searchPrev" class="btn-secondary text-sm"><i class="fas fa-arrow-up mr-1"></i>Prev</button>
+                    <button id="searchNext" class="btn-secondary text-sm"><i class="fas fa-arrow-down mr-1"></i>Next</button>
+                    <button id="searchClear" class="btn-secondary text-sm"><i class="fas fa-eraser mr-1"></i>Pulisci</button>
+                    <span id="searchCount" class="text-sm text-gray-600 ml-2">0 risultati</span>
+                </div>
+                <div id="mdContainer" class="markdown-body"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Marked.js for client-side Markdown rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Embed markdown safely as JSON to avoid JS lint issues -->
+    <script id="mdData" type="application/json">{{ md_content | tojson }}</script>
+    <script>
+        (function(){
+            const mdRaw = document.getElementById('mdData');
+            let md = '';
+            try { md = JSON.parse(mdRaw.textContent || '""'); } catch(e) { md = ''; }
+            marked.setOptions({ breaks: true });
+            const container = document.getElementById('mdContainer');
+            container.innerHTML = marked.parse(md);
+            // Highlight code blocks
+            document.querySelectorAll('#mdContainer pre code').forEach((el) => hljs.highlightElement(el));
+
+            // Keyword search with mark.js
+            const marker = new Mark(container);
+            let results = [];
+            let idx = -1;
+
+            const updateCount = () => {
+                document.getElementById('searchCount').textContent = `${results.length} risultati${results.length && idx>=0 ? ` — ${idx+1}/${results.length}`: ''}`;
+            };
+            const clearHighlights = () => {
+                marker.unmark({ done: () => { results = []; idx = -1; updateCount(); } });
+            };
+            const doSearch = (term) => {
+                clearHighlights();
+                if (!term || term.trim().length < 2) return;
+                marker.mark(term, {
+                    separateWordSearch: true,
+                    caseSensitive: false,
+                    className: 'bg-yellow-200',
+                    done: () => {
+                        results = Array.from(container.querySelectorAll('mark'));
+                        idx = results.length ? 0 : -1;
+                        if (idx>=0) results[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        updateCount();
+                    }
+                });
+            };
+            document.getElementById('searchInput').addEventListener('input', (e) => doSearch(e.target.value));
+            document.getElementById('searchClear').addEventListener('click', () => { document.getElementById('searchInput').value=''; clearHighlights(); });
+            document.getElementById('searchNext').addEventListener('click', () => {
+                if (!results.length) return; idx = (idx+1)%results.length; results[idx].scrollIntoView({ behavior: 'smooth', block: 'center' }); updateCount();
+            });
+            document.getElementById('searchPrev').addEventListener('click', () => {
+                if (!results.length) return; idx = (idx-1+results.length)%results.length; results[idx].scrollIntoView({ behavior: 'smooth', block: 'center' }); updateCount();
+            });
+            // Add separators after H2 (release titles) to improve sectioning
+            document.querySelectorAll('#mdContainer h2').forEach((h2) => { const hr = document.createElement('hr'); h2.after(hr); });
+        })();
+    </script>
+</body>
+</html>

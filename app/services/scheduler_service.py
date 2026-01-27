@@ -290,11 +290,13 @@ class SchedulerService:
                 query_timeout = 300.0
             logger.info(f"[SCHEDULER][{export_id}] START_QUERY timeout={query_timeout}s")
             loop = asyncio.get_event_loop()
+            error_message = None
             try:
                 result = await asyncio.wait_for(loop.run_in_executor(None, self.query_service.execute_query, req_obj), timeout=query_timeout)
             except asyncio.TimeoutError:
                 logger.error(f"[SCHEDULER][{export_id}] TIMEOUT_QUERY superati {query_timeout}s")
                 result = None
+                error_message = f"Timeout query ({int(query_timeout)}s)"
             duration_query = (datetime.now() - start_time).total_seconds()
             logger.info(f"[SCHEDULER][{export_id}] END_QUERY duration={duration_query:.2f}s rows={getattr(result,'row_count',0)}")
             duration = (datetime.now() - start_time).total_seconds()
@@ -317,7 +319,7 @@ class SchedulerService:
                 "status": status,
                 "duration_sec": duration if status == 'success' else None,
                 "row_count": getattr(result, "row_count", 0) if result else 0,
-                "error": getattr(result, "error_message", None) if result else None,
+                "error": (error_message or (getattr(result, "error_message", None) if result else None)),
                 "start_date": start_date_token,
                 "export_mode": export_mode
             })
@@ -370,6 +372,15 @@ class SchedulerService:
                 await asyncio.wait_for(loop.run_in_executor(None, lambda: df.to_excel(tmp_file, index=False)), timeout=write_timeout)
             except asyncio.TimeoutError:
                 logger.error(f"[SCHEDULER][{export_id}] TIMEOUT_WRITE superati {write_timeout}s")
+                # Aggiorna history: contrassegna come fallita per timeout scrittura
+                try:
+                    if self.execution_history and self.execution_history[-1].get('query') == query_filename:
+                        self.execution_history[-1]['status'] = 'fail'
+                        self.execution_history[-1]['error'] = f"Timeout scrittura ({int(write_timeout)}s)"
+                        self.execution_history[-1]['duration_sec'] = None
+                        self.save_history()
+                except Exception:
+                    pass
                 return
             write_duration = (datetime.now() - write_start).total_seconds()
             logger.info(f"[SCHEDULER][{export_id}] END_WRITE duration={write_duration:.2f}s size={tmp_file.stat().st_size}B")
