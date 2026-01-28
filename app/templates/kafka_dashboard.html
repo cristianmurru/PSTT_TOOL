@@ -35,7 +35,7 @@
 <body class="h-full">
     <div class="min-h-full">
         <!-- Navigation Header -->
-        <nav class="bg-white shadow-lg border-b border-gray-200">
+        <nav class="bg-white shadow-lg border-b border-gray-200 relative">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
@@ -43,6 +43,7 @@
                         <span class="font-bold text-xl text-gray-900">{{ app_name }}</span>
                     </div>
                     <div class="flex items-center space-x-4">
+                        {% if app_environment %}{% endif %}
                         <a href="/" class="text-blue-600 hover:underline text-sm">
                             <i class="fas fa-home mr-1"></i>Home
                         </a>
@@ -68,6 +69,9 @@
                     </div>
                 </div>
             </div>
+            {% if app_environment %}
+            <span class="absolute z-50 text-sm leading-5 text-gray-600 uppercase tracking-wide" style="top:50%; right:2cm; transform: translateY(-50%);">{{ app_environment }}</span>
+            {% endif %}
         </nav>
 
         <!-- Status Bar -->
@@ -144,8 +148,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <!-- Breakdown per Topic -->
                     <div class="bg-white shadow rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-3">
-                            <i class="fas fa-list mr-2"></i>Breakdown per Topic (oggi)
+                        <h2 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-list mr-2"></i>
+                            <span>Breakdown per Topic (<span id="selectedPeriodLabel">Oggi</span>)</span>
+                            <span class="ml-3 text-sm text-gray-600">Filtro Topic:</span>
+                            <input id="topicFilterInput" list="topicFilterSuggestions" placeholder="tutti" class="ml-2 border border-gray-300 rounded px-2 py-1 text-sm" style="min-width: 180px;" />
+                            <datalist id="topicFilterSuggestions"></datalist>
                         </h2>
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
@@ -167,8 +175,11 @@
 
                     <!-- Errori Recenti -->
                     <div class="bg-white shadow rounded-lg p-6">
-                        <h2 class="text-lg font-semibold text-gray-900 mb-3">
-                            <i class="fas fa-triangle-exclamation mr-2"></i>Errori Recenti
+                        <h2 class="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                            <i class="fas fa-triangle-exclamation mr-2"></i>
+                            <span>Errori Recenti</span>
+                            <span class="ml-3 text-sm text-gray-600">Filtro Topic:</span>
+                            <input id="topicFilterInputErrors" list="topicFilterSuggestions" placeholder="tutti" class="ml-2 border border-gray-300 rounded px-2 py-1 text-sm" style="min-width: 180px;" />
                         </h2>
                         <div class="overflow-x-auto">
                             <table class="min-w-full text-sm">
@@ -662,12 +673,34 @@
 
         // Period selector for metrics
         const metricsPeriodSelectId = 'metricsPeriodSelect';
+        const periodLabels = { today: 'Oggi', last_7_days: 'Ultimi 7 giorni', last_30_days: 'Ultimi 30 giorni', all: 'Tutto' };
+        let currentTopicFilter = '';
+        let lastSummaryData = null;
+
+        function updateSelectedPeriodLabel(period) {
+            const el = document.getElementById('selectedPeriodLabel');
+            if (el) el.textContent = periodLabels[period] || period;
+        }
+
+        function setTopicFilterOptions(topicKeys) {
+            try {
+                const dl = document.getElementById('topicFilterSuggestions');
+                if (!dl) return;
+                const options = (topicKeys || []).sort().map(t => `<option value="${t}"></option>`).join('');
+                dl.innerHTML = options;
+            } catch(e) {}
+        }
 
         // Render breakdown per topic
         function renderTopicBreakdown(byTopic) {
             const tbody = document.getElementById('topicBreakdownBody');
             tbody.innerHTML = '';
-            const entries = Object.entries(byTopic || {});
+            let entries = Object.entries(byTopic || {});
+            // Apply topic filter (exact or contains, case-insensitive)
+            const filter = (currentTopicFilter || '').trim().toLowerCase();
+            if (filter) {
+                entries = entries.filter(([topic]) => topic.toLowerCase().includes(filter));
+            }
             if (!entries.length) {
                 tbody.innerHTML = '<tr><td class="py-2 text-gray-500" colspan="5">Nessun dato</td></tr>';
                 return;
@@ -695,11 +728,16 @@
         function renderRecentErrors(errors) {
             const tbody = document.getElementById('recentErrorsBody');
             tbody.innerHTML = '';
-            if (!errors || !errors.length) {
+            let list = errors || [];
+            const filter = (currentTopicFilter || '').trim().toLowerCase();
+            if (filter) {
+                list = list.filter(e => (e.topic || '').toLowerCase().includes(filter));
+            }
+            if (!list.length) {
                 tbody.innerHTML = '<tr><td class="py-2 text-gray-500" colspan="4">Nessun errore</td></tr>';
                 return;
             }
-            errors.forEach(e => {
+            list.forEach(e => {
                 const row = document.createElement('tr');
                 row.className = 'border-b';
                 const ts = e.timestamp || '-';
@@ -737,6 +775,15 @@
                 const response = await fetch(`/api/kafka/metrics/summary?period=${encodeURIComponent(period)}`);
                 if (!response.ok) return;
                 const summary = await response.json();
+            lastSummaryData = summary;
+            updateSelectedPeriodLabel(period);
+            // Sync both period selectors
+            try {
+                const sel1 = document.getElementById('metricsPeriodSelect');
+                const sel2 = document.getElementById('metricsPeriodSelectErrors');
+                if (sel1) sel1.value = period;
+                if (sel2) sel2.value = period;
+            } catch(e) {}
 
                 // Update metrics cards (use aggregated values)
                 const totalMessages = summary.total_messages || 0;
@@ -756,6 +803,7 @@
                 document.getElementById('metricsBar').classList.remove('hidden');
 
                 // Render breakdown + recent errors
+                setTopicFilterOptions(Object.keys(summary.by_topic || {}));
                 renderTopicBreakdown(summary.by_topic);
                 renderRecentErrors(summary.recent_errors);
             } catch (error) {
@@ -1059,15 +1107,34 @@
         // Period filter UI (simple select added dynamically near breakdown header)
         (function addPeriodSelector(){
             try {
-                const breakdownHeader = document.querySelector('h2.text-lg.font-semibold.text-gray-900.mb-3');
-                if (breakdownHeader) {
+                const headers = Array.from(document.querySelectorAll('h2.text-lg.font-semibold.text-gray-900.mb-3'));
+                headers.forEach(h => {
                     const sel = document.createElement('select');
-                    sel.id = metricsPeriodSelectId;
+                    const isErrors = (h.textContent || '').includes('Errori Recenti');
+                    sel.id = isErrors ? 'metricsPeriodSelectErrors' : metricsPeriodSelectId;
                     sel.className = 'ml-3 border border-gray-300 rounded px-2 py-1 text-sm';
-                    sel.innerHTML = '<option value="today">Oggi</option><option value="last_7_days">Ultimi 7 giorni</option>';
-                    breakdownHeader.appendChild(sel);
+                    sel.innerHTML = '<option value="today">Oggi</option><option value="last_7_days">Ultimi 7 giorni</option><option value="last_30_days">Ultimi 30 giorni</option>';
+                    h.appendChild(sel);
                     sel.addEventListener('change', ()=> loadMetrics(sel.value));
+                });
+            } catch(e) {}
+        })();
+
+        // Topic filter change handler
+        (function attachTopicFilter(){
+            try {
+                const input1 = document.getElementById('topicFilterInput');
+                const input2 = document.getElementById('topicFilterInputErrors');
+                function onChange(src, other){
+                    currentTopicFilter = (src.value || '');
+                    if (other && other.value !== currentTopicFilter) other.value = currentTopicFilter;
+                    if (lastSummaryData) {
+                        renderTopicBreakdown(lastSummaryData.by_topic);
+                        renderRecentErrors(lastSummaryData.recent_errors);
+                    }
                 }
+                if (input1) input1.addEventListener('input', () => onChange(input1, input2));
+                if (input2) input2.addEventListener('input', () => onChange(input2, input1));
             } catch(e) {}
         })();
 

@@ -2,7 +2,7 @@
 
 **Strumento per l'esecuzione di query parametrizzate su database multi-vendor con scheduling automatico**
 
-![Version](https://img.shields.io/badge/version-1.1.1-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.2-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 
@@ -476,6 +476,7 @@ I log sono salvati in `logs/`:
    - `POST /api/settings/env`
  - Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`.
  - Riavvio dall’UI: pulsante “Riavvia App” con overlay che mostra la fase di riavvio (down/up) tramite polling su `/health`. Backend: `POST /api/system/restart` (riavvio come servizio se disponibile, altrimenti pianificazione rilancio via `start_pstt.bat`).
+ - Badge ENV: configurare `app_environment` in `.env` per mostrare l’etichetta ambiente (`SVILUPPO`, `COLLAUDO`, `PRODUZIONE`) in alto a destra della navbar.
 
 ## 📧 Report giornaliero schedulazioni
 
@@ -492,6 +493,7 @@ I log sono salvati in `logs/`:
 - API:
    - `GET /api/reports/daily?date=YYYY-MM-DD` — anteprima HTML
    - `POST /api/reports/daily/send?date=YYYY-MM-DD` — invio manuale
+ - Comportamento: se `date` non è fornita, il report include le esecuzioni delle **ultime 24 ore** rispetto al momento di generazione; se `date` è fornita, mostra le esecuzioni del giorno indicato.
 
 ### Livelli di Log
 

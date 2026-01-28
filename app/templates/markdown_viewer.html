@@ -31,7 +31,7 @@
 <body class="h-full">
     <div class="min-h-full">
         <!-- Navigation Header -->
-        <nav class="bg-white shadow-lg border-b border-gray-200">
+        <nav class="bg-white shadow-lg border-b border-gray-200 relative">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
@@ -39,14 +39,28 @@
                         <span class="font-bold text-xl text-gray-900">{{ app_name }}</span>
                     </div>
                     <div class="flex items-center space-x-4">
+                        {% if app_environment %}{% endif %}
                         <a href="/" class="text-blue-600 hover:underline text-sm"><i class="fas fa-home mr-1"></i>Home</a>
                         <a href="/dashboard" class="text-blue-600 hover:underline text-sm"><i class="fas fa-calendar-alt mr-1"></i>Schedulazioni</a>
                         <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
                         <a href="/logs" class="text-blue-600 hover:underline text-sm"><i class="fas fa-file-alt mr-1"></i>Log</a>
                         <a href="/settings" class="text-blue-600 hover:underline text-sm"><i class="fas fa-gear mr-1"></i>Impostazioni</a>
+                        <!-- Help Menu -->
+                        <div class="relative">
+                            <button id="helpMenuBtn" class="text-blue-600 hover:underline text-sm px-2 py-1 cursor-pointer" aria-label="Guida">
+                                <i class="fas fa-question-circle"></i>
+                            </button>
+                            <div id="helpDropdown" class="hidden absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                <a href="/docs/readme" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">README</a>
+                                <a href="/docs/changelog" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">CHANGELOG</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            {% if app_environment %}
+            <span class="absolute z-50 text-sm leading-5 text-gray-600 uppercase tracking-wide" style="top:50%; right:2cm; transform: translateY(-50%);">{{ app_environment }}</span>
+            {% endif %}
         </nav>
 
         <!-- Main Content -->
@@ -122,6 +136,18 @@
             });
             // Add separators after H2 (release titles) to improve sectioning
             document.querySelectorAll('#mdContainer h2').forEach((h2) => { const hr = document.createElement('hr'); h2.after(hr); });
+        })();
+    </script>
+    <script>
+        // Help menu toggle
+        (function(){
+            const btn = document.getElementById('helpMenuBtn');
+            const dd = document.getElementById('helpDropdown');
+            if (btn && dd) {
+                btn.addEventListener('click', (e) => { e.stopPropagation(); dd.classList.toggle('hidden'); });
+                document.addEventListener('click', () => { if (!dd.classList.contains('hidden')) dd.classList.add('hidden'); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dd.classList.add('hidden'); });
+            }
         })();
     </script>
 </body>

@@ -7,6 +7,28 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.2] - [2026-01-28] - Badge ENV sobrio in navbar, report mail su ultime 24 ore, fix log UI
+
+### Added
+- 🏷️ **Badge ENV**: etichetta ambiente (`SVILUPPO/COLLAUDO/PRODUZIONE`) visibile ma sobria in alto a destra della navbar, allineata verticalmente ai link.
+
+### Changed
+- 📧 **Report mail**: il riepilogo schedulazioni ora, se eseguito senza data esplicita, seleziona le esecuzioni delle ultime 24 ore rispetto al momento di generazione, invece che dalla mezzanotte corrente.
+- 🔧 **Posizionamento badge**: l'elemento è figlio diretto di `<nav>` con posizionamento assoluto (`top:50%; right:2cm; transform: translateY(-50%)`) per garantire allineamento coerente su tutte le pagine.
+
+### Fixed
+- 🪛 **Logs UI**: rimosso codice JavaScript mostrato in chiaro; loader e toggle sono ora correttamente racchiusi in `<script>`.
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### File toccati (principali)
+- Backend/Servizi: `app/services/daily_report_service.py` (finestra default 24h), `app/services/scheduler_service.py` (job giornaliero usa default 24h).
+- Frontend/Templates: `app/templates/index.html`, `app/templates/kafka_dashboard.html`, `app/templates/markdown_viewer.html`, `app/frontend/scheduler_dashboard.html`, `app/frontend/logs.html`, `app/frontend/settings.html` (badge ENV in navbar, pulizia script).
+- Documentazione: `docs/README.md`, `docs/CHANGELOG.md`.
+
+---
+
 ## [1.1.1] - [2026-01-27] - Menu Aiuto, Viewer Markdown, fix Kafka fields, storico chiarito
 
 ### Added

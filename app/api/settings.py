@@ -41,6 +41,8 @@ ALLOWED_KEYS = [
     # Kafka - Defaults
     "kafka_default_topic",
     "kafka_message_batch_size",
+    # App runtime environment tag
+    "app_environment",
 ]
 
 # Keys where blank values are valid and should be written to .env
@@ -53,6 +55,10 @@ ALLOW_BLANK_KEYS = {
     "kafka_ssl_cafile",
     "kafka_ssl_certfile",
     "kafka_ssl_keyfile",
+    # Daily report optional fields: allow clearing them via blank
+    "daily_report_cc",
+    "daily_report_recipients",
+    "daily_report_cron",
 }
 
 

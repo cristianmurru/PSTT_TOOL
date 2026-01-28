@@ -121,18 +121,26 @@ KAFKA_DEFAULT_INCLUDE_METADATA=true
 # Editare manualmente connections.json e aggiungere sezione kafka_connections
 
 # 7. Test connessione Kafka (senza avviare servizio)
-.\.venv\Scripts\python.exe -c @"
+\.\.venv\Scripts\python.exe -c @"
 import asyncio
 from app.core.config import get_kafka_config
 from app.services.kafka_service import KafkaService
 
 async def test_connection():
-    config = get_kafka_config()
-    async with KafkaService(config) as kafka:
+    cfg = get_kafka_config()
+    if not cfg:
+        print('❌ Kafka non abilitato (.env: KAFKA_ENABLED=false)')
+        return
+    # Passa i due argomenti richiesti: connection_config e producer_config
+    async with KafkaService(cfg['connection'], cfg['producer']) as kafka:
+        ok = await kafka.connect()
+        if not ok:
+            print('❌ Connessione Kafka fallita')
+            return
         health = await kafka.health_check()
         print(f'✅ Connessione Kafka OK: {health.connected}')
         print(f'   Brokers: {health.broker_count}')
-        print(f'   Latency: {health.latency_ms}ms')
+        print(f'   Latency: {health.latency_ms} ms')
 
 asyncio.run(test_connection())
 "@

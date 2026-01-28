@@ -107,6 +107,7 @@ async def home(request: Request):
             "request": request,
             "app_name": settings.app_name,
             "app_version": settings.app_version,
+            "app_environment": settings.app_environment,
             "connections": connections_config.connections,
             "default_connection": connections_config.default_connection,
             "environments": connections_config.environments,
@@ -127,7 +128,8 @@ async def kafka_dashboard(request: Request):
         context = {
             "request": request,
             "app_name": settings.app_name,
-            "app_version": settings.app_version
+            "app_version": settings.app_version,
+            "app_environment": settings.app_environment,
         }
         
         return templates.TemplateResponse("kafka_dashboard.html", context)
@@ -141,10 +143,10 @@ async def kafka_dashboard(request: Request):
 async def readme_page(request: Request):
     """Visualizza README.md come pagina HTML"""
     try:
-        # Preferisce README.md in root; fallback a docs/README.md
+        # Preferisce la versione in docs/ se presente; altrimenti usa README.md in root
         root_path = settings.base_dir / "README.md"
         alt_path = settings.base_dir / "docs" / "README.md"
-        file_path = root_path if root_path.exists() else alt_path
+        file_path = alt_path if alt_path.exists() else root_path
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="README non trovato")
         md_text = file_path.read_text(encoding="utf-8")
@@ -156,6 +158,7 @@ async def readme_page(request: Request):
                 "md_content": md_text,
                 "app_name": settings.app_name,
                 "app_version": settings.app_version,
+                "app_environment": settings.app_environment,
                 "doc_version": None,
             },
         )
@@ -170,10 +173,10 @@ async def readme_page(request: Request):
 async def changelog_page(request: Request):
     """Visualizza CHANGELOG.md come pagina HTML"""
     try:
-        # Preferisce CHANGELOG.md in root; fallback ad eventuale docs/CHANGELOG.md
+        # Preferisce la versione in docs/ se presente; altrimenti usa CHANGELOG.md in root
         root_path = settings.base_dir / "CHANGELOG.md"
         alt_path = settings.base_dir / "docs" / "CHANGELOG.md"
-        file_path = root_path if root_path.exists() else alt_path
+        file_path = alt_path if alt_path.exists() else root_path
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="CHANGELOG non trovato")
         md_text = file_path.read_text(encoding="utf-8")
@@ -204,6 +207,7 @@ async def changelog_page(request: Request):
                 "md_content": md_text_transformed,
                 "app_name": settings.app_name,
                 "app_version": settings.app_version,
+                "app_environment": settings.app_environment,
                 "doc_version": doc_version,
             },
         )

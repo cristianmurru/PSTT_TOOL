@@ -15,7 +15,7 @@
 </head>
 <body class="h-full">
 <div class="min-h-full">
-    <nav class="bg-white shadow-lg border-b border-gray-200">
+    <nav class="bg-white shadow-lg border-b border-gray-200 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
@@ -27,6 +27,7 @@
                     <a href="/kafka" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf550;</span>Kafka</a>
                     <a href="/logs" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf15c;</span>Log</a>
                     <a href="/settings" class="text-blue-600 hover:underline text-sm"><span class="fa-inline mr-1" style="font-family: 'Font Awesome 6 Free'; font-weight:900; display:inline-block; line-height:1;">&#xf013;</span>Impostazioni</a>
+                    
                     <!-- Help Menu -->
                     <div class="relative">
                         <button id="helpMenuBtn" class="text-blue-600 hover:underline text-sm px-2 py-1 cursor-pointer" aria-label="Guida">
@@ -40,6 +41,7 @@
                 </div>
             </div>
         </div>
+        <span id="envBadge" class="absolute z-50 text-sm leading-5 text-gray-600 uppercase tracking-wide" style="top:50%; right:2cm; transform: translateY(-50%);">SVILUPPO</span>
     </nav>
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -92,7 +94,7 @@
                             <label class="form-label">Cron expression</label>
                             <input type="text" class="form-input" name="cron_expression" id="cronExpressionInput" placeholder="e.g. 0 7 * * *">
                             <div id="cronError" class="text-sm text-red-600 mt-1" style="display:none;"></div>
-                            <div id="cronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener">Maggiori info</a></div>
+                            <div id="cronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener" class="underline">Maggiori info</a></div>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-4 mb-2">
@@ -223,7 +225,7 @@ Report_PSTT</textarea>
                             <label class="form-label">Cron expression</label>
                             <input type="text" class="form-input" name="cron_expression" id="editCronExpressionInput" placeholder="e.g. 0 7 * * *">
                             <div id="editCronError" class="text-sm text-red-600 mt-1" style="display:none;"></div>
-                            <div id="editCronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener">Maggiori info</a></div>
+                            <div id="editCronHelp" class="text-sm text-gray-500 mt-1">Usare il formato standard a 5 campi: <code>minute hour day month day-of-week</code>. Esempi: <code>30 7 * * *</code> (ogni giorno 07:30), <code>0 7 * * 1-5</code> (Lun-Ven 07:00), <code>*/15 * * * *</code> (ogni 15 minuti). <a href="https://crontab.guru" target="_blank" rel="noopener" class="underline">Maggiori info</a></div>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-4 mb-2">
@@ -1148,6 +1150,16 @@ fetchHealth();
 fetchHistory();
 setInterval(fetchMonitoring, 10000);
 setInterval(fetchHealth, 15000);
+// Load environment tag badge
+try {
+    (async function loadEnvTag(){
+        const res = await fetch('/api/settings/env');
+        const data = await res.json();
+        const tag = data && data.values ? (data.values.app_environment || data.values.APP_ENVIRONMENT) : null;
+        const el = document.getElementById('envBadge');
+        if (el) el.textContent = (tag || 'SVILUPPO');
+    })();
+} catch(e) {}
 // initialize flatpickr for localized DD/MM/YYYY inputs
 try {
     if (window.flatpickr) {

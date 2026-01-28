@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict
 import smtplib
@@ -34,8 +34,53 @@ class DailyReportService:
         out = []
         for h in all_history:
             try:
-                ts = datetime.fromisoformat(h.get("timestamp"))
-                if ts.date() == day:
+                ts_raw = h.get("timestamp")
+                ts = None
+                if ts_raw:
+                    try:
+                        ts = datetime.fromisoformat(ts_raw)
+                    except Exception:
+                        ts = None
+                if ts is None:
+                    # Fallback: prova da campo start_date se presente
+                    sd = h.get("start_date")
+                    if sd:
+                        try:
+                            ts = datetime.fromisoformat(sd)
+                        except Exception:
+                            try:
+                                ts = datetime.strptime(sd, "%Y-%m-%d %H:%M:%S")
+                            except Exception:
+                                ts = None
+                if ts and ts.date() == day:
+                    out.append(h)
+            except Exception:
+                continue
+        return out
+
+    def _filter_by_last_hours(self, all_history: List[Dict], end_dt: datetime, hours: int = 24) -> List[Dict]:
+        start_dt = end_dt - timedelta(hours=hours)
+        out: List[Dict] = []
+        for h in all_history:
+            ts = None
+            try:
+                ts_raw = h.get("timestamp")
+                if ts_raw:
+                    try:
+                        ts = datetime.fromisoformat(ts_raw)
+                    except Exception:
+                        ts = None
+                if ts is None:
+                    sd = h.get("start_date")
+                    if sd:
+                        try:
+                            ts = datetime.fromisoformat(sd)
+                        except Exception:
+                            try:
+                                ts = datetime.strptime(sd, "%Y-%m-%d %H:%M:%S")
+                            except Exception:
+                                ts = None
+                if ts and (start_dt <= ts <= end_dt):
                     out.append(h)
             except Exception:
                 continue
@@ -127,15 +172,29 @@ class DailyReportService:
         return html
 
     def generate(self, day: Optional[date] = None) -> Dict[str, str]:
-        d = day or date.today()
+        # Se viene fornita una data esplicita, mantiene il comportamento "giornaliero".
+        # Se day è None, estrae le esecuzioni delle ultime 24 ore rispetto all'istante corrente.
         hist = self._load_history()
-        items = self._filter_by_date(hist, d)
-        body_html = self._build_html(d, items)
-        return {
-            "date": d.isoformat(),
-            "items_count": str(len(items)),
-            "body_html": body_html
-        }
+        if day is not None:
+            d = day
+            items = self._filter_by_date(hist, d)
+            body_html = self._build_html(d, items)
+            return {
+                "date": d.isoformat(),
+                "items_count": str(len(items)),
+                "body_html": body_html
+            }
+        else:
+            now = datetime.now()
+            items = self._filter_by_last_hours(hist, now, hours=24)
+            # Manteniamo il titolo con la data odierna per compatibilità visuale
+            d = now.date()
+            body_html = self._build_html(d, items)
+            return {
+                "date": d.isoformat(),
+                "items_count": str(len(items)),
+                "body_html": body_html
+            }
 
     def send_email(self, to_pipe: Optional[str], cc_pipe: Optional[str], subject: str, body_html: str) -> None:
         settings = get_settings()
@@ -182,8 +241,8 @@ class DailyReportService:
         logger.info(f"[DAILY_REPORT] Email inviata - To: {tos} | Cc: {ccs}")
 
     def generate_and_send(self, day: Optional[date] = None) -> None:
-        d = day or date.today()
-        payload = self.generate(d)
+        # Se day è None, usa la finestra delle ultime 24 ore
+        payload = self.generate(day)
         # Subject con token semplici data
         subj = getattr(self.settings, 'daily_report_subject', 'Report schedulazioni PSTT')
         self.send_email(

@@ -42,7 +42,8 @@ def _daily_report_job():
     """Funzione modulare sicura per il reloader: genera e invia il report giornaliero."""
     try:
         svc = DailyReportService()
-        svc.generate_and_send(date.today())
+        # Usa la finestra delle ultime 24 ore rispetto all'esecuzione
+        svc.generate_and_send()
         logger.info("[DAILY_REPORT] Report giornaliero inviato")
     except Exception as e:
         logger.error(f"[DAILY_REPORT] Errore invio report giornaliero: {e}")
