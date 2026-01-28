@@ -117,6 +117,8 @@ class Settings(BaseSettings):
     app_name: str = "PSTT Tool"
     app_version: str = "1.0.0"
     debug: bool = False
+    # Ambiente di esecuzione (SVILUPPO | COLLAUDO | PRODUZIONE)
+    app_environment: str = "SVILUPPO"
     
     # Server settings
     host: str = "127.0.0.1"

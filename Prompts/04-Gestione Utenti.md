@@ -1,14 +1,13 @@
-Obiettivo: Integrare la gestione utenti nellíapplicazione esistente (Python + Java + HTML) che esegue query e procedure su SQL Server, Oracle e PostgreSQL, con funzionalit‡ di scheduling.
+Obiettivo: Integrare la gestione utenti nell'applicazione esistente (Python + Java + HTML) che esegue query e procedure su SQL Server, Oracle e PostgreSQL, con funzionalit√† di scheduling.
 Requisiti funzionali:
 
 Autenticazione basata su dominio Active Directory (max 100 utenti).
-Due ruoli: Amministratore (accesso completo) e Standard (funzionalit‡ limitate).
-Possibilit‡ di associare a ciascun utente un set di query disponibili.
+Due ruoli: Amministratore (accesso completo) e Standard (funzionalit√† limitate).
+Possibilit√† di associare a ciascun utente un set di query disponibili.
 
 Vincoli tecnici:
 
-Utilizzare SQL Server per la gestione utenti (preferenza per familiarit‡).
-Soluzioni freeware o open source.
+Utilizzare soluzioni freeware o open source.
 Le query attualmente risiedono nella cartella Query/ ? serve un meccanismo per mappare query ? utenti.
 
 Aspettative di progetto:
@@ -20,7 +19,7 @@ Aggiornamento della suite di test in parallelo allo sviluppo.
 Contesto:
 
 Allegati: README.md, requirements.txt, struttura cartelle.
-Tecnologie gi‡ in uso: FastAPI, APScheduler, SQLAlchemy, ecc.
+Tecnologie gi√† in uso: FastAPI, APScheduler, SQLAlchemy, ecc.
 
 Richiesta:
 

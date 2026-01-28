@@ -9,7 +9,7 @@
 </head>
 <body class="h-full">
 <div class="min-h-full">
-    <nav class="bg-white shadow-lg border-b border-gray-200">
+    <nav class="bg-white shadow-lg border-b border-gray-200 relative">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
@@ -34,7 +34,9 @@
                 </div>
             </div>
         </div>
+        <span id="envBadge" class="absolute z-50 text-sm leading-5 text-gray-600 uppercase tracking-wide" style="top:50%; right:2cm; transform: translateY(-50%);">SVILUPPO</span>
     </nav>
+
 
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div class="bg-white shadow rounded-lg p-6">
@@ -66,6 +68,16 @@
 </style>
 
 <script>
+// Load environment badge
+(async function loadEnvTag(){
+    try {
+        const res = await fetch('/api/settings/env');
+        const data = await res.json();
+        const tag = data && data.values ? (data.values.app_environment || data.values.APP_ENVIRONMENT) : null;
+        const el = document.getElementById('envBadge');
+        if (el) el.textContent = (tag || 'SVILUPPO');
+    } catch(e) {}
+})();
 async function loadFilesAndDefault() {
     try {
         const r = await fetch('/api/logs/list');
@@ -113,6 +125,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (e.key === 'Escape') dd.classList.add('hidden');
         });
     }
+    // Environment badge
+    (async function loadEnvTag(){
+        try {
+            const res = await fetch('/api/settings/env');
+            const data = await res.json();
+            const tag = data && data.values ? (data.values.app_environment || data.values.APP_ENVIRONMENT) : null;
+            const el = document.getElementById('envBadge');
+            if (el) el.textContent = (tag || 'SVILUPPO');
+        } catch(e) {}
+    })();
 });
 </script>
 </body>
