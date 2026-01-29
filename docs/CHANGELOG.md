@@ -6,20 +6,8 @@ Il formato è basato su [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
-## [1.1.3] - [2026-01-28] - Badge ENV sobrio in navbar, report mail su ultime 24 ore, fix log UI
 
-### Added
-
-### Changed
-
-### Fixed
-
-### Test
-
-### File toccati (principali)
-
-
-## [1.1.4] - [2026-01-29] - Home UX: barra di stato, focus risultati e ritorno rapido
+## [1.1.4] - [2026-01-29] - Home UX e refactoring UI completo
 
 ### Added
 - 🔼 **Torna a selezione**: nuovo pulsante nella testata dei risultati per tornare rapidamente alla sezione di selezione query; nasconde la griglia, azzera contatori e porta la vista in cima alla pagina.
@@ -30,16 +18,40 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - 🔎 **Filtri dinamici**: limitati ai primi 6 campi del recordset per evitare affollamento UI.
 - 🗂️ **Filtro sottocartelle**: selettore sottodirectory in Home con esclusione automatica di `tmp`, `_tmp` e `schedulazioni`.
 - ↕️ **Ordine pulsanti**: nella testata risultati l'ordine è ora `Export Excel` → `Export CSV` → `Torna a selezione`.
+- 🧰 **Refactoring UI**: unificazione layout/navbar e migrazione delle pagine da `app/frontend` a `app/templates` (Home, Logs, Scheduler, Impostazioni); icone/label attive uniformate, badge ENV allineato.
 
 ### Fixed
 - ♻️ **Reset stato**: il ritorno alla selezione ripulisce correttamente preview, filtri e conteggi.
 
 ### Test
-- ✅ 195 passed, ❌ 1 failed — `test_scheduler_dashboard_has_links_to_logs_and_settings` (aspettativa stringa "Scheduler Dashboard" non più presente dopo unificazione UI).
+- ✅ Suite completa: 196 passed, 0 failed.
 
 ### File toccati (principali)
-- Frontend: `app/templates/index.html`, `app/static/js/main.js` (barra di stato riposizionata, focus risultati, pulsante ritorno, limite filtri, ordine pulsanti).
-- Documentazione: `docs/CHANGELOG.md`.
+- Frontend/Templates: `app/templates/index.html`, `app/templates/logs.html`, `app/templates/scheduler_dashboard.html`, `app/templates/settings.html`.
+- Static JS: `app/static/js/main.js`.
+- Documentazione: `docs/CHANGELOG.md`, `docs/README.md`.
+
+---
+
+## [1.1.3] - [2026-01-28] - Badge ENV sobrio in navbar, report mail su ultime 24 ore, fix log UI
+
+### Added
+- 🏷️ **Badge ENV**: etichetta ambiente (`SVILUPPO/COLLAUDO/PRODUZIONE`) visibile ma sobria in alto a destra della navbar, allineata verticalmente ai link.
+
+### Changed
+- 📧 **Report mail**: il riepilogo schedulazioni ora, se eseguito senza data esplicita, seleziona le esecuzioni delle ultime 24 ore rispetto al momento di generazione, invece che dalla mezzanotte corrente.
+- 🔧 **Posizionamento badge**: l'elemento è figlio diretto di `<nav>` con posizionamento assoluto (`top:50%; right:2cm; transform: translateY(-50%)`) per garantire allineamento coerente su tutte le pagine.
+
+### Fixed
+- 🪛 **Logs UI**: rimosso codice JavaScript mostrato in chiaro; loader e toggle sono ora correttamente racchiusi in `<script>`.
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### File toccati (principali)
+- Backend/Servizi: `app/services/daily_report_service.py` (finestra default 24h), `app/services/scheduler_service.py` (job giornaliero usa default 24h).
+- Frontend/Templates: `app/templates/index.html`, `app/templates/kafka_dashboard.html`, `app/templates/markdown_viewer.html`, `app/frontend/scheduler_dashboard.html`, `app/frontend/logs.html`, `app/frontend/settings.html` (badge ENV in navbar, pulizia script).
+- Documentazione: `docs/README.md`, `docs/CHANGELOG.md`.
 
 ## [1.1.2] - [2026-01-27] - Menu Aiuto, Viewer Markdown, fix Kafka fields, storico chiarito
 
