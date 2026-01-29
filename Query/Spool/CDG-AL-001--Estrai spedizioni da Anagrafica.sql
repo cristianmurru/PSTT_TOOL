@@ -20,7 +20,7 @@ define DEST_INDIRIZZO=''  --Opzionale
 define DEST_CITTA=''  --Opzionale
 
 insert into starown.appo_barcode_cm (barcode)
-Select /*+ parallel(a,32) */  distinct MT_Barcode Barcode
+Select /*+ parallel(a,16) */  distinct MT_Barcode Barcode
 from starown.mailpiece_upgrades a
 where mt_trkdate >= to_date('&DATAINIZIO', 'dd/mm/yyyy')
 and mt_trkdate < to_date('&DATAFINE', 'dd/mm/yyyy')
@@ -57,9 +57,9 @@ select
     , M.OPERATOR,  M.arrivetimestamp, m.track_office, UffMitt.OfficeName UffMitt , m.office_other, UffDest.OfficeName UffDest, m.areadest, M.lat_gps, m.long_gps
     , case when dd.Addressee is not null then dd.Addressee else mu.Dest_Name_2 end Dest_Name
     , case when dd.Address is not null then dd.Address else mu.Dest_Ind_2 end Dest_Address
-    , mu.Dest_CAP Dest_CAP   --non c'è campo campo cap su descriptive datas
+    , mu.Dest_CAP Dest_CAP   --non c'  campo campo cap su descriptive datas
     , case when dd.Destination is not null then dd.Destination else mu.Dest_Loc_2 end Dest_Loc
-    , dd.Prov_dest Dest_Prov --non c'è campo campo cap su mailpiece_upgrades
+    , dd.Prov_dest Dest_Prov --non c'  campo campo cap su mailpiece_upgrades
     , case when Tel_Dest is not null then Tel_Dest else mu.Tel_Dest_2 end Tel_Dest
     , case when Email_Dest is not null then Email_Dest else mu.Dest_EMail_2 end Email_Dest
     , case when Mitt_Name is not null then Mitt_Name else mu.Mitt_Name_2 end Mitt_Name

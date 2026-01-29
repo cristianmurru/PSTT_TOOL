@@ -128,8 +128,8 @@
         5,
         6
       ],
-      "hour": 16,
-      "minute": 18,
+      "hour": 8,
+      "minute": 14,
       "second": null,
       "cron_expression": null,
       "end_date": null,

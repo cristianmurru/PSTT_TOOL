@@ -10,6 +10,7 @@ class PSITTool {
         this.lastResults = null;
         this.filters = {};
         this.sorting = {};
+        this.selectedSubdir = 'ALL';
         
         this.initializeEventListeners();
         this.loadQueries();
@@ -40,6 +41,23 @@ class PSITTool {
         document.getElementById('exportCsvBtn').addEventListener('click', () => {
             this.exportResults('csv');
         });
+
+        // Return to selection button (in results header)
+        const returnBtn = document.getElementById('returnToSelectionBtn');
+        if (returnBtn) {
+            returnBtn.addEventListener('click', () => {
+                this.returnToSelection();
+            });
+        }
+
+        // Subdirectory selector (se presente in pagina)
+        const subdirSelector = document.getElementById('subdirSelector');
+        if (subdirSelector) {
+            subdirSelector.addEventListener('change', (e) => {
+                this.selectedSubdir = e.target.value || 'ALL';
+                this.renderQueryList();
+            });
+        }
     }
     
     async loadQueries() {
@@ -54,6 +72,7 @@ class PSITTool {
             }
             
             this.queries = data.queries;
+            this.populateSubdirSelector();
             this.renderQueryList();
             
         } catch (error) {
@@ -61,6 +80,47 @@ class PSITTool {
             this.showError('Errore nel caricamento delle query: ' + error.message);
         } finally {
             this.showLoading(false);
+        }
+    }
+
+    returnToSelection() {
+        // Hide results and reset grid, filters and counters
+        try {
+            const resultsSection = document.getElementById('resultsSection');
+            const filtersRow = document.getElementById('filtersRow');
+            const resultsTable = document.getElementById('resultsTable');
+
+            // Reset internal state
+            this.lastResults = null;
+            this.fullResults = null;
+            this.lastResultsIsPreview = false;
+            this.filters = {};
+            this.sorting = {};
+
+            if (resultsSection) resultsSection.classList.add('hidden');
+            if (filtersRow) {
+                filtersRow.classList.add('hidden');
+                const grid = filtersRow.querySelector('.grid');
+                if (grid) grid.innerHTML = '';
+                else filtersRow.innerHTML = '';
+            }
+            if (resultsTable) {
+                const thead = resultsTable.querySelector('thead');
+                const tbody = resultsTable.querySelector('tbody');
+                if (thead) thead.innerHTML = '';
+                if (tbody) tbody.innerHTML = '';
+            }
+
+            // Update status bar: keep query name if selected, but clear counts/time
+            this.updateStatusBar();
+
+            // Scroll to selection section and focus for keyboard navigation
+            const selection = document.getElementById('selectionSection') || document.body;
+            selection.setAttribute('tabindex', '-1');
+            selection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            try { selection.focus({ preventScroll: true }); } catch (e) {}
+        } catch (e) {
+            console.warn('Errore nel ritorno alla selezione:', e);
         }
     }
     
@@ -100,7 +160,19 @@ class PSITTool {
         const queryList = document.getElementById('queryList');
         queryList.innerHTML = '';
         // Filtra le query in base alla connessione corrente
-        const filteredQueries = this.filterQueriesByConnection();
+        let filteredQueries = this.filterQueriesByConnection();
+        // Escludi alcune sottocartelle dalla Home: tmp e schedulazioni
+        filteredQueries = filteredQueries.filter(q => {
+            const sd = (q.subdirectory || '').toLowerCase();
+            return sd !== 'tmp' && sd !== '_tmp' && sd !== 'schedulazioni';
+        });
+        // Filtra per sottodirectory se selezionata
+        if (this.selectedSubdir && this.selectedSubdir !== 'ALL') {
+            filteredQueries = filteredQueries.filter(q => {
+                const sd = (q.subdirectory || '').replace(/\\/g, '/');
+                return sd === this.selectedSubdir;
+            });
+        }
         // Ordina alfabeticamente per gruppo+nome
         filteredQueries.sort((a, b) => {
             const nameA = this._getQueryDisplayName(a.filename).toLowerCase();
@@ -145,10 +217,40 @@ class PSITTool {
                 <div class="text-xs text-gray-500 mt-1">${query.description || 'Nessuna descrizione'}</div>
                 <div class="text-xs text-gray-400 mt-1">
                     <i class="fas fa-cog mr-1"></i>${query.parameters.length} parametri
+                    ${query.subdirectory ? `<span class=\"ml-2\"><i class=\"fas fa-folder-open mr-1\"></i>${query.subdirectory}</span>` : ''}
                 </div>
             `;
             queryList.appendChild(queryItem);
         });
+    }
+
+    populateSubdirSelector() {
+        const selector = document.getElementById('subdirSelector');
+        if (!selector) return;
+        // Costruisci l'elenco delle sottocartelle presenti, escludendo tmp e schedulazioni
+        const set = new Set();
+        (this.queries || []).forEach(q => {
+            const sd = (q.subdirectory || '').replace(/\\/g, '/');
+            if (sd && sd.toLowerCase() !== 'tmp' && sd.toLowerCase() !== '_tmp' && sd.toLowerCase() !== 'schedulazioni') {
+                set.add(sd);
+            }
+        });
+        const subdirs = Array.from(set).sort();
+        selector.innerHTML = '';
+        const optAll = document.createElement('option');
+        optAll.value = 'ALL';
+        optAll.textContent = 'Tutte le cartelle';
+        selector.appendChild(optAll);
+        subdirs.forEach(sd => {
+            const opt = document.createElement('option');
+            opt.value = sd;
+            opt.textContent = sd;
+            selector.appendChild(opt);
+        });
+        // Mantieni selezione corrente se valida, altrimenti resetta ad ALL
+        const currentValid = this.selectedSubdir === 'ALL' || subdirs.includes(this.selectedSubdir);
+        selector.value = currentValid ? this.selectedSubdir : 'ALL';
+        this.selectedSubdir = selector.value;
     }
 
     _getQueryDisplayName(filename) {
@@ -225,6 +327,27 @@ class PSITTool {
                 `;
                 
                 parametersForm.appendChild(paramDiv);
+
+                // Toggle invalid style on input/blur for required params
+                try {
+                    const inputEl = paramDiv.querySelector(`#param_${param.name}`);
+                    if (inputEl && isRequired) {
+                        const validate = () => {
+                            const hasVal = (inputEl.value || '').trim().length > 0;
+                            if (hasVal) {
+                                inputEl.classList.remove('parameter-invalid');
+                            } else {
+                                inputEl.classList.add('parameter-invalid');
+                            }
+                        };
+                        inputEl.addEventListener('input', validate);
+                        inputEl.addEventListener('blur', validate);
+                        // Initial state: if default_value provided, ensure not invalid
+                        if ((param.default_value || '').trim()) {
+                            inputEl.classList.remove('parameter-invalid');
+                        }
+                    }
+                } catch (e) { /* ignore DOM errors */ }
             });
         }
         
@@ -268,6 +391,19 @@ class PSITTool {
                     parameters[input.name] = input.value.trim();
                 }
             });
+
+            // Mark empty required fields as invalid before executing
+            try {
+                const requiredInputs = form.querySelectorAll('input.parameter-required');
+                requiredInputs.forEach(inp => {
+                    const v = (inp.value || '').trim();
+                    if (!v) {
+                        inp.classList.add('parameter-invalid');
+                    } else {
+                        inp.classList.remove('parameter-invalid');
+                    }
+                });
+            } catch (e) { /* ignore */ }
             
             // Esegue la query
             const response = await fetch('/api/queries/execute', {
@@ -290,6 +426,12 @@ class PSITTool {
                 throw new Error(result.error_message || result.detail || 'Errore nell\'esecuzione della query');
             }
             
+            // Success: ensure required inputs are not shown as invalid anymore
+            try {
+                const requiredInputs = form.querySelectorAll('input.parameter-required');
+                requiredInputs.forEach(inp => inp.classList.remove('parameter-invalid'));
+            } catch (e) { /* ignore */ }
+
             this.lastResults = result;
             // mark as preview only if the returned row_count equals the preview limit
             const previewLimit = 1000;
@@ -345,13 +487,34 @@ class PSITTool {
             this.renderTableRows(result.data);
         }
         resultsSection.classList.remove('hidden');
+
+        // Focus results and scroll into view after execution
+        try {
+            const resultsContainer = document.querySelector('.table-container');
+            const table = document.getElementById('resultsTable');
+            if (resultsContainer) {
+                resultsContainer.setAttribute('tabindex', '0');
+                resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                resultsContainer.focus({ preventScroll: true });
+            } else if (table) {
+                table.setAttribute('tabindex', '0');
+                table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                table.focus({ preventScroll: true });
+            }
+        } catch (e) { /* ignore */ }
     }
     
     renderFilters(columnNames) {
         const filtersRow = document.getElementById('filtersRow');
-        filtersRow.innerHTML = '';
+        const gridContainer = filtersRow ? filtersRow.querySelector('.grid') : null;
+        const target = gridContainer || filtersRow;
+        if (!target) return;
+        target.innerHTML = '';
+        // Mostra filtri solo per i primi 6 campi del recordset per evitare UI affollata
+        const VISIBLE_FILTERS = 6;
+        const colsToFilter = Array.isArray(columnNames) ? columnNames.slice(0, VISIBLE_FILTERS) : [];
         
-        columnNames.forEach(col => {
+        colsToFilter.forEach(col => {
             const filterDiv = document.createElement('div');
             filterDiv.innerHTML = `
                 <input 
@@ -361,7 +524,7 @@ class PSITTool {
                     onkeyup="psittTool.filterTable('${col}', this.value)"
                 />
             `;
-            filtersRow.appendChild(filterDiv);
+            target.appendChild(filterDiv);
         });
         
         filtersRow.classList.remove('hidden');
