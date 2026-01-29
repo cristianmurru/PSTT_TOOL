@@ -36,7 +36,7 @@ class QueryService:
         logger.info(f"QueryService inizializzato - directory query: {self.settings.query_dir}")
     
     def get_queries(self) -> List[QueryInfo]:
-        """Ottiene la lista di tutte le query disponibili"""
+        """Ottiene la lista di tutte le query disponibili (ricorsiva sulle sottocartelle)."""
         try:
             queries = []
             
@@ -44,10 +44,26 @@ class QueryService:
                 logger.warning(f"Directory query non trovata: {self.settings.query_dir}")
                 return queries
             
-            # Scansiona tutti i file SQL nella directory
-            for sql_file in self.settings.query_dir.glob("*.sql"):
+            # Scansiona ricorsivamente tutti i file .sql nelle sottocartelle, includendo radice
+            for sql_file in self.settings.query_dir.rglob("*.sql"):
+                # Escludi cartelle di lavoro temporanee
+                try:
+                    # subdir relativa rispetto alla query_dir
+                    rel = sql_file.relative_to(self.settings.query_dir)
+                    parts = rel.parts[:-1]  # tutte le parti tranne il filename
+                    subdir = os.path.join(*parts) if parts else ""
+                    # normalizza separatore cartelle in formato unix-like per coerenza
+                    subdir = subdir.replace("\\", "/") if subdir else ""
+                    # filtra cartelle da escludere (tmp sempre esclusa; altre esclusioni lato UI)
+                    if any(p.lower() in ["tmp", "_tmp"] for p in parts):
+                        continue
+                except Exception:
+                    subdir = ""
                 try:
                     query_info = self._parse_sql_file(sql_file)
+                    # aggiungi subdir metadata
+                    if query_info:
+                        query_info.subdirectory = subdir
                     if query_info:
                         queries.append(query_info)
                 except Exception as e:
@@ -65,15 +81,23 @@ class QueryService:
             return []
     
     def get_query(self, filename: str) -> Optional[QueryInfo]:
-        """Ottiene i dettagli di una query specifica"""
+        """Ottiene i dettagli di una query specifica (ricerca ricorsiva per nome file)."""
         try:
-            sql_file = self.settings.query_dir / filename
-            
-            if not sql_file.exists():
-                logger.error(f"File query non trovato: {filename}")
-                return None
-            
-            return self._parse_sql_file(sql_file)
+            # Cerca ricorsivamente il file per nome nelle sottocartelle
+            for sql_file in self.settings.query_dir.rglob(filename):
+                if sql_file.name.lower() == filename.lower():
+                    info = self._parse_sql_file(sql_file)
+                    if info:
+                        try:
+                            rel = sql_file.relative_to(self.settings.query_dir)
+                            parts = rel.parts[:-1]
+                            subdir = os.path.join(*parts) if parts else ""
+                            info.subdirectory = subdir.replace("\\", "/") if subdir else ""
+                        except Exception:
+                            pass
+                    return info
+            logger.error(f"File query non trovato: {filename}")
+            return None
             
         except Exception as e:
             logger.error(f"Errore nel recupero della query {filename}: {e}")

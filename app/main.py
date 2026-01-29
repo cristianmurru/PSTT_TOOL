@@ -275,21 +275,39 @@ async def internal_error_handler(request: Request, exc: HTTPException):
 
 
 @app.get("/dashboard", response_class=HTMLResponse, name="scheduler_dashboard")
-async def scheduler_dashboard():
+async def scheduler_dashboard(request: Request):
     """Dashboard schedulazioni e monitoring"""
-    return FileResponse(str(settings.base_dir / "app" / "frontend" / "scheduler_dashboard.html"))
+    context = {
+        "request": request,
+        "app_name": settings.app_name,
+        "app_version": settings.app_version,
+        "app_environment": settings.app_environment,
+    }
+    return templates.TemplateResponse("scheduler_dashboard.html", context)
 
 
 @app.get("/logs", response_class=HTMLResponse, name="logs_viewer")
-async def logs_viewer():
+async def logs_viewer(request: Request):
     """Visualizzatore dei log"""
-    return FileResponse(str(settings.base_dir / "app" / "frontend" / "logs.html"))
+    context = {
+        "request": request,
+        "app_name": settings.app_name,
+        "app_version": settings.app_version,
+        "app_environment": settings.app_environment,
+    }
+    return templates.TemplateResponse("logs.html", context)
 
 
 @app.get("/settings", response_class=HTMLResponse, name="settings_page")
-async def settings_page():
+async def settings_page(request: Request):
     """Pagina impostazioni env"""
-    return FileResponse(str(settings.base_dir / "app" / "frontend" / "settings.html"))
+    context = {
+        "request": request,
+        "app_name": settings.app_name,
+        "app_version": settings.app_version,
+        "app_environment": settings.app_environment,
+    }
+    return templates.TemplateResponse("settings.html", context)
 
 
 if __name__ == "__main__":

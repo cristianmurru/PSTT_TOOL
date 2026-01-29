@@ -27,5 +27,6 @@ def test_scheduler_dashboard_has_links_to_logs_and_settings():
     r = client.get("/dashboard")
     assert r.status_code == 200
     html = r.text
-    assert "Scheduler Dashboard" in html
+    # UI title migrated to Italian; accept either legacy or new title
+    assert ("Scheduler Dashboard" in html) or ("Schedulazioni" in html)
     assert "/logs" in html and "/settings" in html

@@ -32,6 +32,7 @@ class QueryInfo(BaseModel):
     """Informazioni su una query SQL"""
     filename: str = Field(..., description="Nome del file SQL")
     full_path: str = Field(..., description="Percorso completo del file")
+    subdirectory: Optional[str] = Field(default=None, description="Sottodirectory relativa alla cartella Query")
     title: Optional[str] = Field(default=None, description="Titolo estratto dal nome file")
     description: Optional[str] = Field(default=None, description="Descrizione della query")
     parameters: List[QueryParameter] = Field(default=[], description="Parametri della query")

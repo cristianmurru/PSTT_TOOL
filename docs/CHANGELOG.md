@@ -7,7 +7,33 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
-## [1.1.2] - [2026-01-28] - Badge ENV sobrio in navbar, report mail su ultime 24 ore, fix log UI
+## [1.1.4] - [2026-01-29] - Home UX e refactoring UI completo
+
+### Added
+- 🔼 **Torna a selezione**: nuovo pulsante nella testata dei risultati per tornare rapidamente alla sezione di selezione query; nasconde la griglia, azzera contatori e porta la vista in cima alla pagina.
+
+### Changed
+- 📍 **Barra di stato**: spostata tra la selezione query e i risultati per maggiore visibilità nel flusso operativo.
+- 🎯 **Focus risultati**: al termine dell'esecuzione la UI porta il focus sulla tabella/contesto risultati con scroll morbido.
+- 🔎 **Filtri dinamici**: limitati ai primi 6 campi del recordset per evitare affollamento UI.
+- 🗂️ **Filtro sottocartelle**: selettore sottodirectory in Home con esclusione automatica di `tmp`, `_tmp` e `schedulazioni`.
+- ↕️ **Ordine pulsanti**: nella testata risultati l'ordine è ora `Export Excel` → `Export CSV` → `Torna a selezione`.
+- 🧰 **Refactoring UI**: unificazione layout/navbar e migrazione delle pagine da `app/frontend` a `app/templates` (Home, Logs, Scheduler, Impostazioni); icone/label attive uniformate, badge ENV allineato.
+
+### Fixed
+- ♻️ **Reset stato**: il ritorno alla selezione ripulisce correttamente preview, filtri e conteggi.
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### File toccati (principali)
+- Frontend/Templates: `app/templates/index.html`, `app/templates/logs.html`, `app/templates/scheduler_dashboard.html`, `app/templates/settings.html`.
+- Static JS: `app/static/js/main.js`.
+- Documentazione: `docs/CHANGELOG.md`, `docs/README.md`.
+
+---
+
+## [1.1.3] - [2026-01-28] - Badge ENV sobrio in navbar, report mail su ultime 24 ore, fix log UI
 
 ### Added
 - 🏷️ **Badge ENV**: etichetta ambiente (`SVILUPPO/COLLAUDO/PRODUZIONE`) visibile ma sobria in alto a destra della navbar, allineata verticalmente ai link.
@@ -27,9 +53,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - Frontend/Templates: `app/templates/index.html`, `app/templates/kafka_dashboard.html`, `app/templates/markdown_viewer.html`, `app/frontend/scheduler_dashboard.html`, `app/frontend/logs.html`, `app/frontend/settings.html` (badge ENV in navbar, pulizia script).
 - Documentazione: `docs/README.md`, `docs/CHANGELOG.md`.
 
----
-
-## [1.1.1] - [2026-01-27] - Menu Aiuto, Viewer Markdown, fix Kafka fields, storico chiarito
+## [1.1.2] - [2026-01-27] - Menu Aiuto, Viewer Markdown, fix Kafka fields, storico chiarito
 
 ### Added
 - ❓ **Menu Aiuto in tutte le pagine**: aggiunto un'icona "?" in navbar con collegamenti rapidi a README e CHANGELOG.
@@ -52,6 +76,26 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - Frontend: `app/templates/index.html`, `app/frontend/scheduler_dashboard.html`, `app/frontend/logs.html`, `app/frontend/settings.html`, `app/templates/kafka_dashboard.html`, `app/templates/markdown_viewer.html`.
 - Backend/API: `app/main.py` (route docs), `app/api/scheduler.py` (storico, add/put schedulazioni), `app/services/scheduler_service.py` (tracking timeout, export_mode).
 - Documentazione: `docs/README.md`, `docs/CHANGELOG.md`.
+
+## [1.1.1] - [2026-01-23] - Kafka UI metriche allineate, consumer diagnostica e usabilità
+
+### Changed
+- Dashboard Kafka: metriche aggregate allineate agli output dello scheduler (riepilogo, per‑topic, ultimi errori) con filtri periodo e drill‑down.
+- Pulsanti e stati UI: "Leggi Messaggi" ora è disabilitato (grigio) finché la connessione Kafka non è testata; diventa verde quando attiva.
+
+### Added
+- Pannello "Consumer Rapido": lettura messaggi con selezione origine offset (`latest`/`earliest`).
+- Diagnostica topic: nuovo pulsante "Info Topic" lato UI e relativo endpoint API per partizioni e range offset.
+- Suggerimenti topic: datalist con topic di default (es. `PSTT.TEST-COLL`) e suggerimenti contestuali.
+- API Kafka:
+  - `GET /api/kafka/topic-info/{topic}` — informazioni partizioni e offset.
+
+### Fixed
+- `/api/kafka/consume`: rispetto del parametro `period` con seek iniziale coerente e timeout aumentati.
+- Script PowerShell `tools/create_kafka_deploy_package.ps1`: rimossa variabile non utilizzata che causava warning dell'analyzer.
+
+### Test
+- Suite completa: 196 passed, 0 failed.
 
 ## [1.1.0] - [2026-01-21] - Integrazione completa Kafka per pubblicazione messaggi su topic da schedulazioni
 
@@ -428,24 +472,5 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - ODBC Driver 18 for SQL Server (per connessioni SQL Server)
 - Memoria RAM: minimo 2GB, consigliato 4GB
 - Storage: 500MB per installazione base
-## [1.1.1] - [2026-01-23] - Kafka UI metriche allineate, consumer diagnostica e usabilità
-
-### Changed
-- Dashboard Kafka: metriche aggregate allineate agli output dello scheduler (riepilogo, per‑topic, ultimi errori) con filtri periodo e drill‑down.
-- Pulsanti e stati UI: "Leggi Messaggi" ora è disabilitato (grigio) finché la connessione Kafka non è testata; diventa verde quando attiva.
-
-### Added
-- Pannello "Consumer Rapido": lettura messaggi con selezione origine offset (`latest`/`earliest`).
-- Diagnostica topic: nuovo pulsante "Info Topic" lato UI e relativo endpoint API per partizioni e range offset.
-- Suggerimenti topic: datalist con topic di default (es. `PSTT.TEST-COLL`) e suggerimenti contestuali.
-- API Kafka:
-  - `GET /api/kafka/topic-info/{topic}` — informazioni partizioni e offset.
-
-### Fixed
-- `/api/kafka/consume`: rispetto del parametro `period` con seek iniziale coerente e timeout aumentati.
-- Script PowerShell `tools/create_kafka_deploy_package.ps1`: rimossa variabile non utilizzata che causava warning dell'analyzer.
-
-### Test
-- Suite completa: 196 passed, 0 failed.
 
 ---

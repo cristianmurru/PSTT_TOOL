@@ -154,6 +154,51 @@ def get_kafka_connection_config(connection_name: str) -> KafkaConnectionConfig:
     return KafkaConnectionConfig(**kafka_connections[connection_name])
 
 
+@router.get("/topics", summary="Lista topic disponibili nel cluster")
+async def list_topics(connection_name: str = "default"):
+    """
+    Ritorna l'elenco dei topic disponibili nel cluster Kafka per la connessione indicata.
+    """
+    try:
+        from kafka import KafkaConsumer
+
+        conn_config = get_kafka_connection_config(connection_name)
+        consumer_kwargs: Dict[str, Any] = {
+            "bootstrap_servers": conn_config.get_bootstrap_servers_list(),
+            "enable_auto_commit": False,
+            "auto_offset_reset": "latest",
+            "consumer_timeout_ms": 2000,
+        }
+        if conn_config.security_protocol != "PLAINTEXT":
+            consumer_kwargs["security_protocol"] = conn_config.security_protocol
+            if conn_config.sasl_mechanism:
+                consumer_kwargs["sasl_mechanism"] = conn_config.sasl_mechanism
+            if conn_config.sasl_username:
+                consumer_kwargs["sasl_plain_username"] = conn_config.sasl_username
+            if conn_config.sasl_password:
+                consumer_kwargs["sasl_plain_password"] = conn_config.sasl_password
+            if "SSL" in str(conn_config.security_protocol):
+                if conn_config.ssl_cafile:
+                    consumer_kwargs["ssl_cafile"] = conn_config.ssl_cafile
+                if conn_config.ssl_certfile:
+                    consumer_kwargs["ssl_certfile"] = conn_config.ssl_certfile
+                if conn_config.ssl_keyfile:
+                    consumer_kwargs["ssl_keyfile"] = conn_config.ssl_keyfile
+
+        consumer = KafkaConsumer(**consumer_kwargs)
+        topics = sorted(list(consumer.topics() or []))
+        try:
+            consumer.close()
+        except Exception:
+            pass
+        return {"topics": topics, "count": len(topics)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore elenco topic Kafka: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/connections", response_model=KafkaConnectionsResponse, summary="Lista connessioni Kafka")
 async def list_kafka_connections():
     """
