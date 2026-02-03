@@ -23,14 +23,12 @@
             pointer-events: none;
         }
         
-        .table-container {
-            max-height: 70vh;
-            overflow: auto;
-        }
-        
         .status-bar {
             background: linear-gradient(135deg, #1f2937 0%, #374151 100%);
         }
+        /* Disable scroll anchoring within dynamic results area to prevent jumps during filtering */
+        #resultsSection { overflow-anchor: none; }
+        #selectionSection { overflow-anchor: none; }
     </style>
 </head>
 <body class="h-full">
@@ -114,7 +112,7 @@
                                         <!-- popolato dinamicamente -->
                                     </select>
                                 </div>
-                                <div class="border border-gray-300 rounded-md overflow-y-auto" style="max-height:60vh;">
+                                <div class="border border-gray-300 rounded-md overflow-y-auto" style="height:60vh; min-height:60vh; max-height:60vh;">
                                     <div id="queryList" class="divide-y divide-gray-200">
                                         <!-- Le query vengono caricate dinamicamente -->
                                     </div>
@@ -189,7 +187,7 @@
                         </div>
                         
                         <!-- Results Table -->
-                        <div class="table-container">
+                        <div class="table-container" style="height: 70vh; min-height: 70vh; overflow-y: auto;">
                             <table id="resultsTable" class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50 sticky top-0">
                                     <!-- Header viene generato dinamicamente -->

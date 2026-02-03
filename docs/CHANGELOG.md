@@ -7,6 +7,26 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.5] - [2026-02-03] - Fix stabilità barra di stato durante filtri
+
+### Fixed
+- 🎯 **Barra di stato fissa**: eliminato completamente il reflow verticale che causava lo spostamento della barra di stato durante l'applicazione dei filtri su lista query e tabella risultati.
+- 📏 **Altezze fisse container**: container lista query (60vh) e tabella risultati (70vh) ora mantengono dimensioni costanti indipendentemente dal numero di elementi visibili dopo filtro.
+- 🚫 **Scroll anchoring**: disabilitato `overflow-anchor` per prevenire salti automatici del viewport durante aggiornamenti DOM dinamici.
+
+### Changed
+- 🧹 **Codice pulito**: rimossa logica di compensazione scroll (`_lockScroll`, `_unlockScroll`) non più necessaria con altezze fisse.
+- 📐 **CSS inline heights**: altezze ora definite inline per maggiore chiarezza (`height: 60vh; min-height: 60vh`).
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### Comportamento
+- Lo scroll automatico avviene **solo** dopo "Esegui Query" o "Torna a selezione", mai durante l'applicazione dei filtri.
+- La barra di stato rimane sempre visibile e stabile tra la selezione query e i risultati.
+
+---
+
 ## [1.1.4] - [2026-01-29] - Home UX e refactoring UI completo
 
 ### Added
