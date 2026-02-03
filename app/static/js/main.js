@@ -16,7 +16,7 @@ class PSITTool {
         this.loadQueries();
         this.loadConnectionStatus();
     }
-    
+
     initializeEventListeners() {
         // Connection selector
         document.getElementById('connectionSelector').addEventListener('change', (e) => {

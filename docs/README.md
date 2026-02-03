@@ -2,7 +2,7 @@
 
 **Strumento per l'esecuzione di query parametrizzate su database multi-vendor con scheduling automatico**
 
-![Version](https://img.shields.io/badge/version-1.1.4-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 
