@@ -2,7 +2,7 @@
 
 **Strumento per l'esecuzione di query parametrizzate su database multi-vendor con scheduling automatico**
 
-![Version](https://img.shields.io/badge/version-1.1.5-blue.svg)
+![Version](https://img.shields.io/badge/version-1.1.7-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-yellow.svg)
 
@@ -14,6 +14,7 @@
 - ✅ **Filtri e ordinamento**: Funzionalità avanzate sui risultati
 - ✅ **Export multi-formato**: Esportazione in Excel, CSV e **Kafka**
 - ✅ **Scheduling automatico**: Esecuzione pianificata con export verso filesystem, email o Kafka
+- 🔁 **Retry schedulazioni**: Ritenta automaticamente le esecuzioni fallite con ritardo e max tentativi configurabili
 - 📊 **Monitoraggio**: Sistema di log e statistiche con dashboard real-time
 - ✅ **Gestione script SQL multistep**: Esegui script con più step sequenziali, ciascuno con parametri e log dedicati
 - ✅ **Gestione asincrona e concorrente dei job schedulati**: le schedulazioni vengono eseguite in parallelo grazie ad APScheduler con AsyncIOExecutor, evitando job saltati e garantendo performance anche con workflow complessi
@@ -250,6 +251,15 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
    - `CDG-NXV--006--Mazzetti creati.sql`
    - `CDG-NXV--008--Esiti.sql`
 
+### Retry automatico schedulazioni
+
+- Comportamento: in caso di errore (timeout query/scrittura o failure export, incluso Kafka), viene pianificato un job one‑off di retry con `DateTrigger`.
+- Configurazione (da UI e `.env`):
+   - `scheduler_retry_enabled` (default: `true`)
+   - `scheduler_retry_delay_minutes` (default: `30`)
+   - `scheduler_retry_max_attempts` (default: `3`)
+- Tracciamento: gli eventi di retry vengono registrati in `scheduler_history.json` con stato `retry_scheduled` e dettaglio tentativo (`attempt i/n`).
+
 ## ⚙️ Impostazioni (.env) da UI e sicurezza
 
 - La pagina [app/frontend/settings.html](app/frontend/settings.html) consente di modificare un sottoinsieme whitelestato di chiavi `.env` (SMTP, Daily Report, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`).
@@ -475,6 +485,7 @@ I log sono salvati in `logs/`:
    - `GET /api/settings/env`
    - `POST /api/settings/env`
  - Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`.
+ - Scheduler Retry: `scheduler_retry_enabled`, `scheduler_retry_delay_minutes`, `scheduler_retry_max_attempts` (visibili e modificabili in `/settings`).
  - Riavvio dall’UI: pulsante “Riavvia App” con overlay che mostra la fase di riavvio (down/up) tramite polling su `/health`. Backend: `POST /api/system/restart` (riavvio come servizio se disponibile, altrimenti pianificazione rilancio via `start_pstt.bat`).
  - Badge ENV: configurare `app_environment` in `.env` per mostrare l’etichetta ambiente (`SVILUPPO`, `COLLAUDO`, `PRODUZIONE`) in alto a destra della navbar.
 

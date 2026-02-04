@@ -7,6 +7,51 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.7] - [2026-02-04] - Retry schedulazioni e impostazioni da UI
+
+### Added
+- 🔁 **Retry automatico schedulazioni in errore**: su timeout query/scrittura o errori export (incluso Kafka), il sistema pianifica automaticamente un job di retry one‑off tramite `DateTrigger`, con ritardo e numero massimo di tentativi configurabili.
+- ⚙️ **Impostazioni da UI estese**: aggiunte chiavi configurabili da pagina Impostazioni per il comportamento del scheduler:
+  - `scheduler_retry_enabled`
+  - `scheduler_retry_delay_minutes`
+  - `scheduler_retry_max_attempts`
+
+### Changed
+- 🧭 Storico schedulazioni: eventi di retry tracciati come `retry_scheduled` con dettaglio tentativo e messaggio d'errore.
+- 📚 Documentazione aggiornata per chiarire il flusso di retry e le nuove impostazioni.
+
+### Test
+- ✅ Estesa suite pytest per coprire i flussi di retry:
+  - Retry su timeout query
+  - Retry su timeout scrittura
+  - Retry su failure export Kafka (success rate basso)
+  - Normalizzazione cron a 5 campi durante update API senza alterare `connection`/`query`
+
+### File toccati (principali)
+- Backend/Servizi: `app/services/scheduler_service.py` (metodo `_schedule_retry`, integrazione retry in rami failure)
+- Frontend/Templates: `app/templates/settings.html` (nuove impostazioni scheduler)
+- Documentazione: `docs/CHANGELOG.md`, `docs/README.md`
+
+---
+
+## [1.1.6] - [2026-02-04] - Edit schedulazioni stabile (preserva selezioni)
+
+### Fixed
+- 🛠️ **Modifica schedulazioni non cambia più automaticamente connessione e query**: quando si apre il form di modifica, le selezioni correnti vengono preservate e non vengono sovrascritte dalla ripopolazione asincrona.
+- 🧯 **Guard repopolazione durante `isEditing`**: la funzione di aggiornamento connessioni evita overwrite; il dropdown query ripristina correttamente il valore preferito/precedente.
+
+### Changed
+- 🎚️ Migliorata coerenza dei dropdown in modalità modifica, evitando salti di stato UI.
+
+### Test
+- ✅ Suite completa: 196 passed, 0 failed.
+
+### File toccati (principali)
+- Frontend/Templates: `app/templates/scheduler_dashboard.html` (preservazione selezioni, guard repopolazione).
+- Documentazione: `docs/CHANGELOG.md`, `docs/README.md`.
+
+---
+
 ## [1.1.5] - [2026-02-03] - Fix stabilità barra di stato durante filtri
 
 ### Fixed
