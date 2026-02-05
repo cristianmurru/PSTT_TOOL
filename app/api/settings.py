@@ -23,6 +23,10 @@ ALLOWED_KEYS = [
     # Timeouts
     "scheduler_query_timeout_sec",
     "scheduler_write_timeout_sec",
+    # Scheduler retry
+    "scheduler_retry_enabled",
+    "scheduler_retry_delay_minutes",
+    "scheduler_retry_max_attempts",
     # Kafka - Connection
     "kafka_enabled",
     "kafka_bootstrap_servers",

@@ -7,6 +7,48 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.8] - [2026-02-05] - Compressione export .gz e riorganizzazione script servizio
+
+### Added
+- 💾 **Compressione export gzip**: nuovo flag "Comprimi .gz" nelle schedulazioni per salvare file Excel compressi (`.xls.gz`)
+  - Riduzione spazio disco ~10-30% con compressione lossless (gzip level 6)
+  - Apertura trasparente in Windows Explorer (doppio click apre direttamente Excel)
+  - Naming `.xls.gz` invece di `.xlsx.gz` per migliore integrazione Windows
+  - Fallback automatico a `.xlsx` non compresso in caso di errore compressione
+- ✅ **Test compressione**: nuovo test `test_compress_export.py` che verifica integrità file compressi/decompressi
+
+### Changed
+- ♻️ **Rimosso flag "Includi timestamp"**: sostituito dalla funzionalità di compressione (timestamp già disponibile via token `{timestamp}`)
+- 🔧 **Script servizio in tools/**: spostati `install_service.ps1`, `manage_service.ps1`, `nssm.exe` dalla root alla cartella `tools/`
+  - Aggiornati tutti i riferimenti nella documentazione (README, KAFKA_SETUP, KAFKA_RUNBOOK, TROUBLESHOOTING)
+  - Aggiornato script diagnostico `tools/diagnose_restart.ps1`
+- 📋 **Cleanup docs**: eliminata cartella `docs/Obsoleti/` (21 file obsoleti), preservati 3 file Kafka essenziali spostati in `docs/`
+- 📝 **Documentazione aggiornata**: TESTING.md e TROUBLESHOOTING.md modernizzati con funzionalità v1.1.7
+
+### Fixed
+- 🧪 **Test path**: corretto path in `test_system_restart.py` per cercare `install_service.ps1` in `tools/` invece che root
+
+### Technical Details
+- Modello: aggiunto campo `output_compress_gz` in `SchedulingItem`, rimosso `output_include_timestamp`
+- Scheduler: implementata logica compressione post-export in `scheduler_service.py`
+  - Log dettagliati: `COMPRESS_START`, `COMPRESS_OK`, `COMPRESS_FAIL`
+  - Cleanup automatico file `.gz` già gestito dal sistema esistente (>30 giorni)
+- UI: checkbox "Comprimi .gz" in form ADD/EDIT schedulazioni
+
+### Test
+- ✅ Suite completa: 201 passed, 0 failed.
+
+### File toccati (principali)
+- Backend/Models: `app/models/scheduling.py` (campo `output_compress_gz`)
+- Backend/Services: `app/services/scheduler_service.py` (logica compressione gzip)
+- Backend/Config: `app/core/config.py` (normalizzazione scheduling)
+- Frontend/Templates: `app/templates/scheduler_dashboard.html` (UI checkbox compressione)
+- Tests: `tests/test_compress_export.py` (nuovo), `tests/test_system_restart.py` (path fix), `tests/unit/test_scheduling_item.py` (uso token timestamp)
+- Tools: `tools/install_service.ps1`, `tools/manage_service.ps1`, `tools/nssm.exe`, `tools/diagnose_restart.ps1`
+- Documentazione: `docs/README.md`, `docs/TESTING.md`, `docs/TROUBLESHOOTING.md`, `docs/KAFKA_SETUP.md`, `docs/KAFKA_RUNBOOK.md`, `docs/CHANGELOG.md`
+
+---
+
 ## [1.1.7] - [2026-02-04] - Retry schedulazioni e impostazioni da UI
 
 ### Added
@@ -21,6 +63,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - 📚 Documentazione aggiornata per chiarire il flusso di retry e le nuove impostazioni.
 
 ### Test
+- ✅ Suite completa: 201 passed, 0 failed.
 - ✅ Estesa suite pytest per coprire i flussi di retry:
   - Retry su timeout query
   - Retry su timeout scrittura
@@ -160,7 +203,7 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 - Script PowerShell `tools/create_kafka_deploy_package.ps1`: rimossa variabile non utilizzata che causava warning dell'analyzer.
 
 ### Test
-- Suite completa: 196 passed, 0 failed.
+- ✅ Suite completa: 196 passed, 0 failed.
 
 ## [1.1.0] - [2026-01-21] - Integrazione completa Kafka per pubblicazione messaggi su topic da schedulazioni
 

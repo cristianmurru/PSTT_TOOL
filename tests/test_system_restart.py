@@ -300,7 +300,7 @@ class TestNSSMConfiguration:
         """
         from pathlib import Path
         
-        script_path = Path(__file__).resolve().parents[1] / "install_service.ps1"
+        script_path = Path(__file__).resolve().parents[1] / "tools" / "install_service.ps1"
         assert script_path.exists(), "install_service.ps1 not found"
         
         content = script_path.read_text(encoding="utf-8")

@@ -8,6 +8,7 @@ from loguru import logger
 import os
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.date import DateTrigger
 from app.services.query_service import QueryService
 from app.core.config import get_settings
 from pathlib import Path
@@ -327,13 +328,26 @@ class SchedulerService:
             self.save_history()
 
             if not result or not getattr(result, 'success', True):
-                logger.error(f"[SCHEDULER] Errore export {query_filename}: {getattr(result, 'error_message', 'unknown')}")
+                err_msg = getattr(result, 'error_message', 'unknown') if result else (error_message or 'unknown')
+                logger.error(f"[SCHEDULER] Errore export {query_filename}: {err_msg}")
+                # Retry scheduling if enabled
+                try:
+                    await self._schedule_retry(sched, start_time, err_msg)
+                except Exception:
+                    logger.exception("[SCHEDULER] Retry scheduling errore")
                 return
 
             # Costruisci filename dal template usando SchedulingItem
+            compress_gz = sched.get('output_compress_gz', False)
             try:
                 sched_item = SchedulingItem(**sched)
                 filename = sched_item.render_filename(start_time)
+                # Assicura estensione .xlsx
+                if not filename.endswith('.xlsx'):
+                    if filename.endswith('.xls'):
+                        filename = filename[:-4] + '.xlsx'
+                    elif not '.' in filename.split('/')[-1]:
+                        filename += '.xlsx'
             except Exception:
                 logger.exception("Impossibile creare SchedulingItem o generare filename, uso fallback")
                 filename = f"{query_filename.replace('.sql','')}_{datetime.now().strftime('%Y-%m-%d')}.xlsx"
@@ -358,7 +372,7 @@ class SchedulerService:
             # Strategia temp locale: crea file temporaneo e poi move atomico
             tmp_dir = Path(output_dir) / "_tmp"
             tmp_dir.mkdir(parents=True, exist_ok=True)
-            tmp_file = tmp_dir / f"{filename}.tmp.xlsx"
+            tmp_file = tmp_dir / f"{filename}.tmp"
             write_start = datetime.now()
             logger.info(f"[SCHEDULER][{export_id}] START_WRITE temp={tmp_file}")
             write_timeout = _to_int(getattr(self.settings, 'scheduler_write_timeout_sec', 120), 120)
@@ -382,6 +396,11 @@ class SchedulerService:
                         self.save_history()
                 except Exception:
                     pass
+                # Schedule retry
+                try:
+                    await self._schedule_retry(sched, start_time, f"Timeout scrittura ({int(write_timeout)}s)")
+                except Exception:
+                    logger.exception("[SCHEDULER] Retry scheduling errore")
                 return
             write_duration = (datetime.now() - write_start).total_seconds()
             logger.info(f"[SCHEDULER][{export_id}] END_WRITE duration={write_duration:.2f}s size={tmp_file.stat().st_size}B")
@@ -400,6 +419,27 @@ class SchedulerService:
             else:
                 logger.error(f"[SCHEDULER][{export_id}] MOVE_ABORT dopo {move_attempts} tentativi; file rimane in {tmp_file}")
                 return
+
+            # Comprimi in .gz se richiesto
+            if compress_gz:
+                try:
+                    import gzip
+                    # Crea nome file .xls.gz (quando Windows apre il .gz, mostrerà nome senza .gz)
+                    # Il file interno rimane .xlsx ma il .gz avrà estensione .xls.gz
+                    base_name = filepath.stem  # nome senza estensione
+                    gz_path = filepath.parent / f"{base_name}.xls.gz"
+                    
+                    logger.info(f"[SCHEDULER][{export_id}] COMPRESS_START {filepath} -> {gz_path}")
+                    with open(filepath, 'rb') as f_in:
+                        with gzip.open(gz_path, 'wb', compresslevel=6) as f_out:
+                            f_out.writelines(f_in)
+                    # Rimuovi file originale dopo compressione
+                    filepath.unlink()
+                    filepath = gz_path
+                    logger.info(f"[SCHEDULER][{export_id}] COMPRESS_OK {gz_path} size={gz_path.stat().st_size}B")
+                except Exception as compress_err:
+                    logger.error(f"[SCHEDULER][{export_id}] COMPRESS_FAIL {compress_err}")
+                    # Continua comunque con il file non compresso
 
             total_duration = (datetime.now() - start_time).total_seconds()
             logger.info(f"[SCHEDULER][{export_id}] EXPORT_COMPLETED total_duration={total_duration:.2f}s final={filepath}")
@@ -447,6 +487,11 @@ class SchedulerService:
                         self.execution_history[-1]['error'] = f"Kafka export failed: {str(kafka_err)}"
                         self.execution_history[-1]['status'] = 'fail'
                         self.save_history()
+                    # Schedule retry
+                    try:
+                        await self._schedule_retry(sched, start_time, f"Kafka export failed: {str(kafka_err)}")
+                    except Exception:
+                        logger.exception("[SCHEDULER] Retry scheduling errore")
 
         except Exception as e:
             logger.error(f"[SCHEDULER] Errore durante export {args}: {e}\n{traceback.format_exc()}")
@@ -465,6 +510,11 @@ class SchedulerService:
                 "export_mode": "unknown"
             })
             self.save_history()
+            # Schedule retry on generic failure
+            try:
+                await self._schedule_retry(locals().get('sched', {}), datetime.now(), str(e))
+            except Exception:
+                logger.exception("[SCHEDULER] Retry scheduling errore")
 
     async def _execute_kafka_export(
         self,
@@ -743,6 +793,55 @@ class SchedulerService:
             "fail_count": fail_count,
             "avg_duration_sec": avg_time
         }
+
+    async def _schedule_retry(self, sched: dict, start_time: datetime, error_msg: str):
+        """Schedule a retry for a failed scheduled export based on Settings.
+        Adds a one-off job using DateTrigger after the configured delay.
+        """
+        try:
+            settings = get_settings()
+            enabled = str(getattr(settings, 'scheduler_retry_enabled', True)).lower() != 'false'
+            if not enabled:
+                return
+            delay_min = _to_int(getattr(settings, 'scheduler_retry_delay_minutes', 30), 30)
+            max_attempts = _to_int(getattr(settings, 'scheduler_retry_max_attempts', 3), 3)
+            attempt = int(sched.get('retry_attempt', 0) or 0)
+            if attempt >= max_attempts:
+                logger.info("[SCHEDULER] Retry max attempts raggiunti, nessun nuovo tentativo")
+                return
+            run_date = datetime.now() + timedelta(minutes=delay_min)
+            new_sched = dict(sched)
+            new_sched['retry_attempt'] = attempt + 1
+            # Log in history that a retry is scheduled
+            try:
+                self.execution_history.append({
+                    "query": new_sched.get('query'),
+                    "connection": new_sched.get('connection'),
+                    "timestamp": datetime.now().isoformat(),
+                    "status": "retry_scheduled",
+                    "duration_sec": None,
+                    "row_count": 0,
+                    "error": f"{error_msg} — retry in {delay_min} min (attempt {attempt+1}/{max_attempts})",
+                    "start_date": None,
+                    "export_mode": new_sched.get('sharing_mode', 'filesystem')
+                })
+                self.save_history()
+            except Exception:
+                pass
+            # Add one-off job
+            if self.scheduler:
+                name = f"Retry Export {new_sched.get('query')} on {new_sched.get('connection')} attempt {attempt+1}"
+                self.scheduler.add_job(
+                    self.run_scheduled_query,
+                    DateTrigger(run_date=run_date),
+                    args=[new_sched],
+                    name=name,
+                    misfire_grace_time=600,
+                    coalesce=False
+                )
+                logger.info(f"[SCHEDULER] Retry schedulato per {new_sched.get('query')} alle {run_date.isoformat()} (attempt {attempt+1})")
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Errore schedule retry: {e}")
     
     def remove_scheduling(self, query_filename, connection_name):
         """Rimuove una schedulazione attiva e il relativo job dal scheduler."""

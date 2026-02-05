@@ -190,6 +190,10 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     # Timeout esecuzione query schedulatore (secondi)
     scheduler_query_timeout_sec: int = 900  # default 15 minuti
+    # Scheduler retry settings
+    scheduler_retry_enabled: bool = True
+    scheduler_retry_delay_minutes: int = 30
+    scheduler_retry_max_attempts: int = 3
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"
@@ -230,7 +234,7 @@ def get_settings() -> Settings:
                     item.setdefault('output_filename_template', s.get('output_filename_template', '{query_name}_{date}.xlsx'))
                     item.setdefault('output_date_format', s.get('output_date_format', '%Y-%m-%d'))
                     item.setdefault('output_offset_days', s.get('output_offset_days', 0))
-                    item.setdefault('output_include_timestamp', s.get('output_include_timestamp', False))
+                    item.setdefault('output_compress_gz', s.get('output_compress_gz', False))
                     item.setdefault('sharing_mode', s.get('sharing_mode', 'filesystem'))
                     # default export dir from settings
                     item.setdefault('output_dir', s.get('output_dir', str(_settings.export_dir)))

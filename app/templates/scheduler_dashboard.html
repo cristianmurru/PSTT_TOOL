@@ -137,8 +137,9 @@
                             <div id="filenameTemplateHelp" class="text-sm text-gray-500 mt-1">Token disponibili: <code>{query_name}</code>, <code>{date}</code>, <code>{date-1}</code>, <code>{timestamp}</code></div>
                         </div>
                         <div class="flex-1 min-w-[160px]">
-                            <label class="form-label">Includi timestamp</label>
-                            <input type="checkbox" name="output_include_timestamp" id="outputIncludeTimestamp">
+                            <label class="form-label">Comprimi .gz</label>
+                            <input type="checkbox" name="output_compress_gz" id="outputCompressGz">
+                            <div class="text-sm text-gray-500 mt-1">Salva file compresso .xls.gz</div>
                         </div>
                     </div>
                     <!-- Sostituisce la riga Condivisione + Output/Email (ADD form) -->
@@ -269,8 +270,9 @@ Report_PSTT</textarea>
                             <div id="editFilenameTemplateHelp" class="text-sm text-gray-500 mt-1">Token disponibili: <code>{query_name}</code>, <code>{date}</code>, <code>{date-1}</code>, <code>{timestamp}</code></div>
                         </div>
                         <div class="flex-1 min-w-[160px]">
-                            <label class="form-label">Includi timestamp</label>
-                            <input type="checkbox" name="output_include_timestamp" id="editOutputIncludeTimestamp">
+                            <label class="form-label">Comprimi .gz</label>
+                            <input type="checkbox" name="output_compress_gz" id="editOutputCompressGz">
+                            <div class="text-sm text-gray-500 mt-1">Salva file compresso .xls.gz</div>
                         </div>
                     </div>
                     <!-- Sostituisce la riga Condivisione + Output/Email (EDIT form) -->
@@ -432,32 +434,67 @@ let schedulingData = [];
 let connections = [];
 let queries = [];
 let kafkaConnections = [];
+let isEditing = false; // evita auto-reset dei campi durante modifica
 
 function fetchConnections() {
-    fetch('/api/connections/list')
+    return fetch('/api/connections/list')
         .then(r => r.json())
         .then(data => {
             connections = data.connections || [];
-            const select = document.getElementById('connectionSelect');
-            select.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+            // Populate ADD form always
+            const addSelect = document.getElementById('connectionSelect');
+            if (addSelect) {
+                addSelect.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+            }
+            // During EDIT, avoid clobbering user selection due to async repopulation
             const editSelect = document.getElementById('editConnectionSelect');
-            editSelect.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+            if (editSelect) {
+                if (isEditing) {
+                    // Preserve current value if present; only add missing options without resetting selection
+                    const currentVal = editSelect.value;
+                    const existing = new Set(Array.from(editSelect.options).map(o => o.value));
+                    const toAdd = connections.filter(c => !existing.has(c.name));
+                    if (toAdd.length) {
+                        const frag = document.createDocumentFragment();
+                        toAdd.forEach(c => {
+                            const opt = document.createElement('option');
+                            opt.value = c.name;
+                            opt.textContent = `${c.name} (${c.environment})`;
+                            frag.appendChild(opt);
+                        });
+                        editSelect.appendChild(frag);
+                    }
+                    // Restore selection explicitly
+                    if (currentVal) editSelect.value = currentVal;
+                } else {
+                    // Not editing: safe to repopulate fully, but preserve current if still available
+                    const currentVal = editSelect.value;
+                    editSelect.innerHTML = connections.map(c => `<option value="${c.name}">${c.name} (${c.environment})</option>`).join('');
+                    if (currentVal) {
+                        const exists = connections.some(c => c.name === currentVal);
+                        if (exists) editSelect.value = currentVal;
+                    }
+                }
+            }
         });
 }
 
 function fetchQueries() {
-    fetch('/api/queries')
+    return fetch('/api/queries')
         .then(r => r.json())
         .then(data => {
             queries = data.queries || [];
             // popolamento rinviato ai cambi di connessione per filtrare le query disponibili
             updateQuerySelectByConnection('connectionSelect', 'querySelect');
-            updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect');
+            // Nota: NON aggiornare automaticamente i select dell'edit form qui.
+            // Lo stato di modifica può sovrapporsi asincronamente (ambiente lento)
+            // causando override dei valori precompilati. L'edit form gestisce
+            // l'aggiornamento esplicito in showEditForm() e sul change della connessione.
         });
 }
 
 function fetchKafkaConnections() {
-    fetch('/api/kafka/connections')
+    return fetch('/api/kafka/connections')
         .then(r => r.json())
         .then(data => {
             kafkaConnections = (data && data.connections) ? data.connections : [];
@@ -537,109 +574,117 @@ function hideAddForm() {
     document.getElementById('add-form').style.display = 'none';
 }
 
-function showEditForm(idx) {
-    fetchConnections();
-    fetchQueries();
-    fetchKafkaConnections();
-    setTimeout(() => {
-        const s = schedulingData[idx];
-        document.getElementById('editQuerySelect').value = s.query;
-        document.getElementById('editConnectionSelect').value = s.connection;
-        document.querySelector('#edit-form input[name="hour"]').value = s.hour;
-        document.querySelector('#edit-form input[name="minute"]').value = s.minute;
-        
-        document.querySelector('#edit-form input[name="idx"]').value = idx;
-        // display end_date as DD/MM/YYYY if ISO provided
-        if (s.end_date) {
-            const parts = s.end_date.split('-');
-            if (parts.length === 3) document.querySelector('#edit-form input[name="end_date"]').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
-            else document.querySelector('#edit-form input[name="end_date"]').value = s.end_date;
-        } else {
-            document.querySelector('#edit-form input[name="end_date"]').value = '';
-        }
-        // scheduling mode & cron
-        const schedMode = s.scheduling_mode || 'classic';
-        const editSchedEl = document.querySelector('#edit-form select[name="scheduling_mode"]');
-        if (editSchedEl) editSchedEl.value = schedMode;
-        const cronEl = document.querySelector('#edit-form input[name="cron_expression"]');
-        if (cronEl) cronEl.value = s.cron_expression || '';
-        // filename template and include timestamp
-        const outTpl = document.querySelector('#edit-form input[name="output_filename_template"]');
-        if (outTpl) outTpl.value = s.output_filename_template || '{query_name}_{date}.xlsx';
-        const outTs = document.querySelector('#edit-form input[name="output_include_timestamp"]');
-        if (outTs) outTs.checked = !!s.output_include_timestamp;
-        // sharing
-        const editSharing = document.querySelector('#edit-form select[name="sharing_mode"]');
-        if (editSharing) editSharing.value = s.sharing_mode || 'filesystem';
-        const editOutDir = document.querySelector('#edit-form input[name="output_dir"]');
-        if (editOutDir) editOutDir.value = s.output_dir || '';
-        // populate email fields
-        const editEmailTo = document.querySelector('#edit-form input[name="email_to"]');
-        if (editEmailTo) editEmailTo.value = s.email_to || s.email_recipients || '';
-        const editEmailCc = document.querySelector('#edit-form input[name="email_cc"]');
-        if (editEmailCc) editEmailCc.value = s.email_cc || '';
-        const editEmailSubject = document.querySelector('#edit-form input[name="email_subject"]');
-        if (editEmailSubject) editEmailSubject.value = s.email_subject || '';
-        const editEmailBody = document.querySelector('#edit-form textarea[name="email_body"]');
-        if (editEmailBody) editEmailBody.value = s.email_body || '';
-        // Prefill defaults in Edit when empty and sharing is Email
-        const DEFAULT_SUBJECT = 'Export scheduler';
-        const DEFAULT_BODY = "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT";
-        const daysSelect = document.getElementById('editDaysOfWeekSelect');
-        Array.from(daysSelect.options).forEach(opt => {
-            opt.selected = s.days_of_week && s.days_of_week.includes(parseInt(opt.value));
-        });
+async function showEditForm(idx) {
+    isEditing = true;
+    // attendi il completamento delle chiamate asincrone per evitare race condition
+    try {
+        await Promise.all([
+            fetchConnections(),
+            fetchQueries(),
+            fetchKafkaConnections()
+        ]);
+    } catch (e) {
+        // anche in caso di errore, procedi con i dati già disponibili
+    }
+    const s = schedulingData[idx];
+    document.getElementById('editQuerySelect').value = s.query;
+    document.getElementById('editConnectionSelect').value = s.connection;
+    document.querySelector('#edit-form input[name="hour"]').value = s.hour;
+    document.querySelector('#edit-form input[name="minute"]').value = s.minute;
+
+    document.querySelector('#edit-form input[name="idx"]').value = idx;
+    // display end_date as DD/MM/YYYY if ISO provided
+    if (s.end_date) {
+        const parts = s.end_date.split('-');
+        if (parts.length === 3) document.querySelector('#edit-form input[name="end_date"]').value = `${parts[2]}/${parts[1]}/${parts[0]}`;
+        else document.querySelector('#edit-form input[name="end_date"]').value = s.end_date;
+    } else {
+        document.querySelector('#edit-form input[name="end_date"]').value = '';
+    }
+    // scheduling mode & cron
+    const schedMode = s.scheduling_mode || 'classic';
+    const editSchedEl = document.querySelector('#edit-form select[name="scheduling_mode"]');
+    if (editSchedEl) editSchedEl.value = schedMode;
+    const cronEl = document.querySelector('#edit-form input[name="cron_expression"]');
+    if (cronEl) cronEl.value = s.cron_expression || '';
+    // filename template and compress gz
+    const outTpl = document.querySelector('#edit-form input[name="output_filename_template"]');
+    if (outTpl) outTpl.value = s.output_filename_template || '{query_name}_{date}.xlsx';
+    const outGz = document.querySelector('#edit-form input[name="output_compress_gz"]');
+    if (outGz) outGz.checked = !!s.output_compress_gz;
+    // sharing
+    const editSharing = document.querySelector('#edit-form select[name="sharing_mode"]');
+    if (editSharing) editSharing.value = s.sharing_mode || 'filesystem';
+    const editOutDir = document.querySelector('#edit-form input[name="output_dir"]');
+    if (editOutDir) editOutDir.value = s.output_dir || '';
+    // populate email fields
+    const editEmailTo = document.querySelector('#edit-form input[name="email_to"]');
+    if (editEmailTo) editEmailTo.value = s.email_to || s.email_recipients || '';
+    const editEmailCc = document.querySelector('#edit-form input[name="email_cc"]');
+    if (editEmailCc) editEmailCc.value = s.email_cc || '';
+    const editEmailSubject = document.querySelector('#edit-form input[name="email_subject"]');
+    if (editEmailSubject) editEmailSubject.value = s.email_subject || '';
+    const editEmailBody = document.querySelector('#edit-form textarea[name="email_body"]');
+    if (editEmailBody) editEmailBody.value = s.email_body || '';
+    // Prefill defaults in Edit when empty and sharing is Email
+    const DEFAULT_SUBJECT = 'Export scheduler';
+    const DEFAULT_BODY = "Buongiorno,\nin allegato estrazione relativa l'oggetto, generata da procedura automatica.\nSaluti,\nReport_PSTT";
+    const daysSelect = document.getElementById('editDaysOfWeekSelect');
+    Array.from(daysSelect.options).forEach(opt => {
+        opt.selected = s.days_of_week && s.days_of_week.includes(parseInt(opt.value));
+    });
     // ensure fields reflect mode (enable/disable cron input instead of show/hide)
     toggleFieldsForMode(document.getElementById('form-edit-schedule'), schedMode);
     const editCronEl = document.querySelector('#edit-form input[name="cron_expression"]');
     if (editCronEl) editCronEl.disabled = schedMode !== 'cron';
-        // ensure sharing box visibility reflects current value immediately (including Kafka)
-        const editSharingMode = document.getElementById('editSharingModeSelect');
-                // Kafka: prefill connection if present
-                const editKafkaConnSel = document.getElementById('editKafkaConnectionSelect');
-                if (editKafkaConnSel && s.kafka_connection) {
-                    editKafkaConnSel.value = s.kafka_connection;
-                }
-                // Kafka: prefill topic, key, batch size, include metadata if present
-                const editKafkaTopicInput = document.getElementById('editKafkaTopicInput');
-                if (editKafkaTopicInput) {
-                    editKafkaTopicInput.value = (s.kafka_topic !== undefined && s.kafka_topic !== null) ? s.kafka_topic : '';
-                }
-                const editKafkaKeyFieldInput = document.getElementById('editKafkaKeyFieldInput');
-                if (editKafkaKeyFieldInput) {
-                    editKafkaKeyFieldInput.value = (s.kafka_key_field !== undefined && s.kafka_key_field !== null) ? s.kafka_key_field : '';
-                }
-                const editKafkaBatchSizeInput = document.getElementById('editKafkaBatchSizeInput');
-                if (editKafkaBatchSizeInput) {
-                    editKafkaBatchSizeInput.value = (s.kafka_batch_size !== undefined && s.kafka_batch_size !== null) ? s.kafka_batch_size : 100;
-                }
-                const editKafkaIncludeMetadataInput = document.getElementById('editKafkaIncludeMetadataInput');
-                if (editKafkaIncludeMetadataInput) {
-                    editKafkaIncludeMetadataInput.checked = (s.kafka_include_metadata !== undefined && s.kafka_include_metadata !== null) ? !!s.kafka_include_metadata : true;
-                }
-        const editEmailBox = document.getElementById('editEmailFieldsBox');
-        const editOutputDirBox = document.getElementById('editOutputDirBox');
-        const editKafkaBox = document.getElementById('editKafkaFieldsBox');
-        applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox, editKafkaBox);
-        if (editSharingMode && editSharingMode.value === 'email') {
-            if (editEmailSubject && !editEmailSubject.value) editEmailSubject.value = DEFAULT_SUBJECT;
-            if (editEmailBody && !editEmailBody.value) editEmailBody.value = DEFAULT_BODY;
-        }
-        document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
-        document.getElementById('edit-form').style.display = 'block';
-        document.getElementById('add-form').style.display = 'none';
-        // porta l'attenzione dell'utente sul form di modifica
-        const editFormEl = document.getElementById('edit-form');
-        if (editFormEl) editFormEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        const firstEditField = document.getElementById('editConnectionSelect') || document.getElementById('editQuerySelect');
-        if (firstEditField) firstEditField.focus();
-        // filtra le query in base alla connessione corrente e ripristina la selezione
-        updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect', s.query);
-    }, 100);
+    // ensure sharing box visibility reflects current value immediately (including Kafka)
+    const editSharingMode = document.getElementById('editSharingModeSelect');
+    // Kafka: prefill connection if present
+    const editKafkaConnSel = document.getElementById('editKafkaConnectionSelect');
+    if (editKafkaConnSel && s.kafka_connection) {
+        editKafkaConnSel.value = s.kafka_connection;
+    }
+    // Kafka: prefill topic, key, batch size, include metadata if present
+    const editKafkaTopicInput = document.getElementById('editKafkaTopicInput');
+    if (editKafkaTopicInput) {
+        editKafkaTopicInput.value = (s.kafka_topic !== undefined && s.kafka_topic !== null) ? s.kafka_topic : '';
+    }
+    const editKafkaKeyFieldInput = document.getElementById('editKafkaKeyFieldInput');
+    if (editKafkaKeyFieldInput) {
+        editKafkaKeyFieldInput.value = (s.kafka_key_field !== undefined && s.kafka_key_field !== null) ? s.kafka_key_field : '';
+    }
+    const editKafkaBatchSizeInput = document.getElementById('editKafkaBatchSizeInput');
+    if (editKafkaBatchSizeInput) {
+        editKafkaBatchSizeInput.value = (s.kafka_batch_size !== undefined && s.kafka_batch_size !== null) ? s.kafka_batch_size : 100;
+    }
+    const editKafkaIncludeMetadataInput = document.getElementById('editKafkaIncludeMetadataInput');
+    if (editKafkaIncludeMetadataInput) {
+        editKafkaIncludeMetadataInput.checked = (s.kafka_include_metadata !== undefined && s.kafka_include_metadata !== null) ? !!s.kafka_include_metadata : true;
+    }
+    const editEmailBox = document.getElementById('editEmailFieldsBox');
+    const editOutputDirBox = document.getElementById('editOutputDirBox');
+    const editKafkaBox = document.getElementById('editKafkaFieldsBox');
+    applySharingBoxVisibility(editSharingMode, editEmailBox, editOutputDirBox, editKafkaBox);
+    if (editSharingMode && editSharingMode.value === 'email') {
+        if (editEmailSubject && !editEmailSubject.value) editEmailSubject.value = DEFAULT_SUBJECT;
+        if (editEmailBody && !editEmailBody.value) editEmailBody.value = DEFAULT_BODY;
+    }
+    document.getElementById('edit-schedule-name').textContent = s.query + ' su ' + s.connection;
+    document.getElementById('edit-form').style.display = 'block';
+    document.getElementById('add-form').style.display = 'none';
+    // porta l'attenzione dell'utente sul form di modifica
+    const editFormEl = document.getElementById('edit-form');
+    if (editFormEl) editFormEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const firstEditField = document.getElementById('editConnectionSelect') || document.getElementById('editQuerySelect');
+    if (firstEditField) firstEditField.focus();
+    // filtra le query in base alla connessione corrente e ripristina la selezione
+    updateQuerySelectByConnection('editConnectionSelect', 'editQuerySelect', s.query);
+    isEditing = false; // fine fase di popolamento
 }
 
 function hideEditForm() {
     document.getElementById('edit-form').style.display = 'none';
+    isEditing = false;
 }
 
 // helper to enable/disable fields based on scheduling mode (available globally)
@@ -830,7 +875,7 @@ function setupFormToggles() {
             scheduling_mode: mode,
             cron_expression: form.cron_expression ? form.cron_expression.value || undefined : undefined,
             output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
-            output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false
+            output_compress_gz: form.output_compress_gz ? form.output_compress_gz.checked : false
         };
         fetch('/api/scheduler/preview', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
             .then(r => r.json()).then(d => { document.getElementById('previewAddResult').textContent = d.filename; })
@@ -864,7 +909,7 @@ function setupFormToggles() {
             scheduling_mode: mode,
             cron_expression: form.cron_expression ? form.cron_expression.value || undefined : undefined,
             output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
-            output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false
+            output_compress_gz: form.output_compress_gz ? form.output_compress_gz.checked : false
         };
         fetch('/api/scheduler/preview', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) })
             .then(r => r.json()).then(d => { document.getElementById('previewEditResult').textContent = d.filename; })
@@ -894,7 +939,7 @@ document.getElementById('form-add-schedule')?.addEventListener('submit', functio
         scheduling_mode: mode,
         cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
         output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
-        output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
+        output_compress_gz: form.output_compress_gz ? form.output_compress_gz.checked : false,
         sharing_mode: sharingMode,
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
         // email fields (UI)
@@ -944,7 +989,7 @@ document.getElementById('form-edit-schedule')?.addEventListener('submit', functi
         scheduling_mode: mode,
         cron_expression: mode === 'cron' ? (form.cron_expression ? form.cron_expression.value || undefined : undefined) : undefined,
         output_filename_template: form.output_filename_template ? form.output_filename_template.value : undefined,
-        output_include_timestamp: form.output_include_timestamp ? form.output_include_timestamp.checked : false,
+        output_compress_gz: form.output_compress_gz ? form.output_compress_gz.checked : false,
         sharing_mode: sharingMode,
         output_dir: form.output_dir ? form.output_dir.value || undefined : undefined,
         // email fields (UI)

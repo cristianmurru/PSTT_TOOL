@@ -37,7 +37,7 @@ class SchedulingItem(BaseModel):
     output_filename_template: Optional[str] = Field("{query_name}_{date}.xlsx", description="Template nome file output, usa {query_name}, {date}, {date-1}, {timestamp}")
     output_date_format: Optional[str] = Field("%Y-%m-%d", description="Formato data per {date}")
     output_offset_days: Optional[int] = Field(0, description="Offset giorni applicato per {date}, es: -1 per ieri")
-    output_include_timestamp: Optional[bool] = Field(False, description="Includi timestamp completo nel nome file")
+    output_compress_gz: Optional[bool] = Field(False, description="Comprimi file in formato .gz")
 
     # Condivisione file
     sharing_mode: SharingMode = Field(SharingMode.FILESYSTEM, description="Modalità di condivisione: filesystem o email")
@@ -107,9 +107,6 @@ class SchedulingItem(BaseModel):
         for k, v in replacements.items():
             fname = fname.replace(f"{{{k}}}", str(v))
         
-        # if timestamp requested but not in template, append if flag set
-        if self.output_include_timestamp and "{timestamp}" not in fname:
-            fname = f"{fname.rstrip('.xlsx')}_{replacements['timestamp']}.xlsx"
         return fname
 
 

@@ -65,7 +65,7 @@ PSTT_Tool/
 ├── Query/                      # File query SQL
 ├── exports/                    # File export e metriche (scheduler_*, kafka_*)
 ├── logs/                       # File di log (esclusi da git)
-├── tests/                      # Test unitari e integrazione (196 test)
+├── tests/                      # Test unitari e integrazione (201 test)
 ├── tools/                      # Utility (kafka_benchmark.py)
 ├── docs/                       # Documentazione completa
 ├── connections.json            # Configurazione connessioni DB e Kafka
@@ -520,7 +520,7 @@ python main.py
 
 ## 🧪 Test
 
-Il progetto include una suite completa di 196 test automatici con coverage elevata:
+Il progetto include una suite completa di 201 test automatici con coverage elevata:
 
 ```bash
 # Esegui tutti i test
@@ -620,36 +620,36 @@ Per garantire che l'applicazione sia eseguita in background, si riavvii automati
 Passaggi principali (riassunto):
 
 1. Scarica NSSM da https://nssm.cc/download e copia `nssm.exe` nella root del progetto o in una cartella nel `PATH`.
-2. Usa lo script `install_service.ps1` fornito nella root del progetto per installare/ricreare il servizio (richiede privilegi amministrativi):
+2. Usa lo script `install_service.ps1` fornito nella cartella tools per installare/ricreare il servizio (richiede privilegi amministrativi):
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\install_service.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\install_service.ps1
 ```
 
 Lo script configura automaticamente i log e il riavvio in caso di failure.
 
 ### Comandi utili per la gestione del servizio
 
-I comandi seguenti sono disponibili tramite lo script `manage_service.ps1` incluso nel repository. Esegui sempre PowerShell come amministratore per le operazioni di installazione/disinstallazione e gestione del servizio.
+I comandi seguenti sono disponibili tramite lo script `manage_service.ps1` nella cartella tools. Esegui sempre PowerShell come amministratore per le operazioni di installazione/disinstallazione e gestione del servizio.
 
 ```powershell
 # Stato del servizio
-.\manage_service.ps1 -Action status
+.\tools\manage_service.ps1 -Action status
 
 # Avvia
-.\manage_service.ps1 -Action start
+.\tools\manage_service.ps1 -Action start
 
 # Ferma
-.\manage_service.ps1 -Action stop
+.\tools\manage_service.ps1 -Action stop
 
 # Riavvia
-.\manage_service.ps1 -Action restart
+.\tools\manage_service.ps1 -Action restart
 
 # Mostra gli ultimi log (stdout/stderr)
-.\manage_service.ps1 -Action logs
+.\tools\manage_service.ps1 -Action logs
 
 # Disinstalla il servizio (rimuove la registrazione NSSM)
-.\manage_service.ps1 -Action uninstall
+.\tools\manage_service.ps1 -Action uninstall
 ```
 
 Se preferisci usare `nssm.exe` direttamente (se è nel `PATH` o nella cartella corrente):
@@ -689,7 +689,7 @@ python main.py --host 0.0.0.0 --port 8001
 ### Note operative
 
 - I file di configurazione e i dati (es. `connections.json`, `Query/`, `Export/`) sono condivisi tra il servizio e le istanze manuali: evita di modificare in parallelo per non creare race condition.
-- I log del servizio si trovano in `logs/service_stdout.log` e `logs/service_stderr.log` (configurati da `install_service.ps1`).
+- I log del servizio si trovano in `logs/service_stdout.log` e `logs/service_stderr.log` (configurati da `tools/install_service.ps1`).
 - Per mantenere il repository leggero, valuta se tenere `nssm.exe` nella repo o copiarlo sul server in una cartella del `PATH`.
 
 
