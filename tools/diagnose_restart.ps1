@@ -46,7 +46,7 @@ if ($nssmCmd) {
 
 # 3. Verifica manage_service.ps1
 Write-Host "`n[3/8] Verifica manage_service.ps1..." -ForegroundColor Yellow
-$manageScript = Join-Path $PSScriptRoot "..\manage_service.ps1"
+$manageScript = Join-Path $PSScriptRoot "manage_service.ps1"
 if (Test-Path $manageScript) {
     Write-Host "  ✅ manage_service.ps1 trovato" -ForegroundColor Green
 } else {

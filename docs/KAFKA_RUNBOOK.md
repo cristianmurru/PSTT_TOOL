@@ -127,7 +127,7 @@ Copy-Item C:\App\PSTT_TOOL\.env C:\Backup\.env_$(Get-Date -Format "yyyyMMdd_HHmm
 
 ```powershell
 # Script automatizzato
-C:\App\PSTT_TOOL\manage_service.ps1 -action restart
+C:\App\PSTT_TOOL\tools\manage_service.ps1 -action restart
 
 # Oppure manualmente:
 Restart-Service PSTT_Service

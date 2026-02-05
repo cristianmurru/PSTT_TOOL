@@ -118,25 +118,17 @@
       "connection": "A00-CDG-Collaudo",
       "enabled": true,
       "description": null,
-      "scheduling_mode": "classic",
-      "days_of_week": [
-        0,
-        1,
-        2,
-        3,
-        4,
-        5,
-        6
-      ],
-      "hour": 8,
-      "minute": 14,
+      "scheduling_mode": "cron",
+      "days_of_week": null,
+      "hour": null,
+      "minute": null,
       "second": null,
-      "cron_expression": null,
-      "end_date": null,
+      "cron_expression": "*/2 * * * *",
+      "end_date": "2026-02-04",
       "output_filename_template": "{query_name}_{date-1}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "output_compress_gz": true,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
       "email_recipients": null,
@@ -173,7 +165,7 @@
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "compress_gz": false,
       "sharing_mode": "email",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
       "email_recipients": null,
@@ -185,7 +177,8 @@
       "kafka_key_field": null,
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
-      "kafka_connection": null
+      "kafka_connection": null,
+      "output_compress_gz": false
     },
     {
       "query": "TT2_UFFICIO-PCL-001--Estrai operatori PTL.sql",
@@ -210,7 +203,7 @@
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "compress_gz": false,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\exports",
       "email_recipients": null,
@@ -222,11 +215,12 @@
       "kafka_key_field": null,
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
-      "kafka_connection": null
+      "kafka_connection": null,
+      "output_compress_gz": false
     },
     {
-      "query": "CDG-NXV--008--Esiti.sql",
-      "connection": "A00-CDG-Collaudo",
+      "query": "CDG-DSX-001--Mazzetti DSX giornalieri - sintetico.sql",
+      "connection": "C00-CDG-Produzione",
       "enabled": true,
       "description": null,
       "scheduling_mode": "classic",
@@ -239,15 +233,15 @@
         5,
         6
       ],
-      "hour": 11,
-      "minute": 10,
+      "hour": 10,
+      "minute": 32,
       "second": null,
       "cron_expression": null,
       "end_date": null,
-      "output_filename_template": "{query_name}_{date-1}.xlsx",
+      "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "output_compress_gz": true,
       "sharing_mode": "filesystem",
       "output_dir": "C:\\App\\PSTT_TOOL\\Exports",
       "email_recipients": null,
@@ -284,7 +278,7 @@
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "compress_gz": false,
       "sharing_mode": "filesystem",
       "output_dir": null,
       "email_recipients": null,
@@ -296,7 +290,8 @@
       "kafka_key_field": null,
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
-      "kafka_connection": null
+      "kafka_connection": null,
+      "output_compress_gz": false
     },
     {
       "query": "BOSC-INF--001--Prodotti.sql",
@@ -321,7 +316,7 @@
       "output_filename_template": "{query_name}_{date-1}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "compress_gz": false,
       "sharing_mode": "filesystem",
       "output_dir": null,
       "email_recipients": null,
@@ -333,7 +328,8 @@
       "kafka_key_field": null,
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
-      "kafka_connection": null
+      "kafka_connection": null,
+      "output_compress_gz": false
     },
     {
       "query": "CDG-KAFKA-001--SelezioneTracceGiornaliere.sql",
@@ -350,7 +346,7 @@
       "output_filename_template": "{query_name}_{date}.xlsx",
       "output_date_format": "%Y-%m-%d",
       "output_offset_days": 0,
-      "output_include_timestamp": false,
+      "compress_gz": false,
       "sharing_mode": "kafka",
       "output_dir": null,
       "email_recipients": null,
@@ -362,7 +358,8 @@
       "kafka_key_field": "BARCODE",
       "kafka_batch_size": 100,
       "kafka_include_metadata": true,
-      "kafka_connection": "Kafka-COL"
+      "kafka_connection": "Kafka-COL",
+      "output_compress_gz": false
     }
   ]
 }

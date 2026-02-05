@@ -813,7 +813,7 @@ Procedura per aggiornare credenziali senza downtime:
    Copy-Item .env.new .env
    
    # Restart servizio
-   .\manage_service.ps1 -action restart
+   .\tools\manage_service.ps1 -action restart
    ```
 
 4. **Verifica:**
@@ -925,7 +925,7 @@ Usa message header o campo `type` per distinguere.
 # 1. Disabilita job Kafka via UI
 # 2. Se necessario, rollback codice
 git checkout <tag-pre-kafka>
-.\manage_service.ps1 -action restart
+.\tools\manage_service.ps1 -action restart
 ```
 
 ---
@@ -955,7 +955,7 @@ exports/scheduler_history.json   # History job
 Get-Service PSTT_Service
 
 # Restart servizio
-.\manage_service.ps1 -action restart
+.\tools\manage_service.ps1 -action restart
 
 # Tail log in real-time
 Get-Content logs\pstt_*.log -Wait -Tail 50
