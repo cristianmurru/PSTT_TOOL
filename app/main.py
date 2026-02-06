@@ -218,6 +218,34 @@ async def changelog_page(request: Request):
         raise HTTPException(status_code=500, detail="Errore interno del server")
 
 
+@app.get("/docs/troubleshooting", response_class=HTMLResponse, name="troubleshooting_page")
+async def troubleshooting_page(request: Request):
+    """Visualizza TROUBLESHOOTING.md come pagina HTML"""
+    try:
+        # Cerca in docs/TROUBLESHOOTING.md
+        file_path = settings.base_dir / "docs" / "TROUBLESHOOTING.md"
+        if not file_path.exists():
+            raise HTTPException(status_code=404, detail="TROUBLESHOOTING non trovato")
+        md_text = file_path.read_text(encoding="utf-8")
+        return templates.TemplateResponse(
+            "markdown_viewer.html",
+            {
+                "request": request,
+                "title": "TROUBLESHOOTING",
+                "md_content": md_text,
+                "app_name": settings.app_name,
+                "app_version": settings.app_version,
+                "app_environment": settings.app_environment,
+                "doc_version": None,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore nel rendering TROUBLESHOOTING: {e}")
+        raise HTTPException(status_code=500, detail="Errore interno del server")
+
+
 @app.get("/health", name="health_check")
 async def health_check():
     """Endpoint per health check"""

@@ -7,6 +7,74 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.1.9] - [2026-02-06] - Fix restart servizio e conteggio fallimenti report
+
+### Fixed
+- 🔄 **Restart applicazione da UI**: risolto problema restart servizio Windows senza privilegi amministratore
+  - Implementato "hot restart": terminazione processo con exit code 0 per trigger auto-restart NSSM
+  - Script PowerShell salvati su disco come processi completamente detached (sopravvivono al parent)
+  - Strategia multi-livello: Windows native → NSSM restart → NSSM stop+start  
+  - Configurato NSSM con `AppExit Default Restart` per riavvio automatico
+  - Tempo restart totale: ~7 secondi (2 sec delay + 5 sec NSSM)
+  - **Ricarica completa**: connections.json, schedulazioni, configurazioni Kafka/SMTP, codice Python
+- 📊 **Conteggio fallimenti report**: corretto conteggio fallimenti nel report giornaliero
+  - Includeva solo status "fail", ora include anche "retry_scheduled"
+  - Report ora mostra correttamente tutti i tentativi falliti
+- 📚 **TROUBLESHOOTING nel viewer**: aggiunto TROUBLESHOOTING.md al markdown viewer dell'applicazione
+  - Accessibile da menu Help in tutte le pagine (navbar)
+  - Link presente in: index, scheduler_dashboard, logs, settings, kafka_dashboard, markdown_viewer
+
+### Changed  
+- 🔧 **Sistema restart**: nuovo parametro `hot_restart=true` (default) nell'endpoint `/api/system/restart`
+  - `hot_restart=true`: termina processo Python, NSSM riavvia automaticamente (NO admin richiesto)
+  - `hot_restart=false`: usa strategie originali Windows service restart (richiede admin)
+- 📝 **Nuovo endpoint**: `GET /api/system/service/restart-logs` per consultare log di restart temporanei
+
+### Technical Details
+- Backend/API: `app/api/system.py`
+  - Funzione `_schedule_hot_restart()`: terminazione controllata con Timer e os._exit(0)
+  - Funzione `_restart_as_service()`: script PowerShell salvati in %TEMP% con logging dettagliato
+  - Processo detached: flags `DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP` (0x00000208)
+  - Log file temporanei: `%TEMP%\pstt_restart_<timestamp>.ps1` e `.log`
+- Backend/Services: `app/services/daily_report_service.py`
+  - Logica conteggio: `status in ("fail", "retry_scheduled")` invece di `status == "fail"`
+- Frontend: `app/main.py`  
+  - Route `GET /docs/troubleshooting`: rendering TROUBLESHOOTING.md con template markdown_viewer.html
+- Frontend/Templates: tutti i template HTML aggiornati con link TROUBLESHOOTING in helpDropdown
+- NSSM Configuration: servizio configurato con `AppExit Default Restart` e `AppRestartDelay 5000ms`
+- Tests: `tests/test_system_restart.py`
+  - 18 test totali per restart (3 nuovi per hot_restart)
+  - Test per `_schedule_hot_restart()`, exit code 0, Timer scheduling
+  - Aggiornati test esistenti per nuovo comportamento (script su file invece di inline)
+
+### Root Cause Analysis
+**Problema restart originale:**
+1. Script PowerShell inline moriva quando processo Python parent terminava
+2. NSSM perdeva traccia del PID dopo os.execv() (sostituiva processo invece di terminare)
+3. Comandi `Stop-Service`/`Start-Service` richiedono privilegi amministratore
+
+**Soluzione implementata:**
+1. Script salvati su disco: sopravvivono indipendentemente dal parent
+2. Exit code 0: NSSM interpreta come "terminazione pulita" e riavvia automaticamente
+3. NSSM gestisce il restart: nessun privilegio amministratore richiesto per l'utente
+
+### Test
+- ✅ Suite completa: 206 passed, 0 failed
+- ✅ Test restart: 18 passed (inclusi 3 nuovi test hot_restart)
+- ✅ Test regressioni: nessuna regressione introdotta
+
+### File toccati (principali)
+- Backend/API: `app/api/system.py` (hot restart, script detached, endpoint restart-logs)
+- Backend/Services: `app/services/daily_report_service.py` (conteggio fallimenti)
+- Frontend/Main: `app/main.py` (route /docs/troubleshooting)
+- Frontend/Templates: `app/templates/*.html` (6 file: link TROUBLESHOOTING in help menu)
+- Docs: `docs/TROUBLESHOOTING.md` (modifiche utente)
+- Tests: `tests/test_system_restart.py` (3 nuovi test, 6 test aggiornati)
+- Config: NSSM service (configurato AppExit Default Restart)
+- Files: `nssm.exe` (ripristinato in root per compatibilità servizio)
+
+---
+
 ## [1.1.8] - [2026-02-05] - Compressione export .gz e riorganizzazione script servizio
 
 ### Added

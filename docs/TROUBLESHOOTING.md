@@ -2,47 +2,6 @@
 
 ## Errori Comuni e Soluzioni
 
-### ❌ Errori Driver Database Oracle
-
-#### Problema: `connect() got an unexpected keyword argument 'encoding'`
-
-**Causa**: Il nuovo driver `oracledb` (2.x) non supporta più i parametri `encoding` e `nencoding` che erano utilizzati nel vecchio `cx_Oracle`.
-
-**Soluzione**: ✅ **RISOLTO** - I parametri sono stati rimossi dalla configurazione pool.
-
-```python
-# PRIMA (non funzionava):
-"connect_args": {
-    "encoding": "UTF-8",
-    "nencoding": "UTF-8"
-}
-
-# DOPO (corretto):
-"connect_args": {}
-```
-
----
-
-### ❌ Errori di Connessione Database
-
-#### Problema: Errori di connettività non mostrati sulla console
-
-**Causa**: Il logging degli errori era configurato solo per i file di log.
-
-**Soluzione**: ✅ **RISOLTO** - Aggiunto logging errori sulla console.
-
-```python
-# Ora tutti gli errori vengono mostrati sia su console che su file
-logger.add(
-    sink=lambda msg: print(msg, end=""),
-    level="ERROR",  # Sempre mostra errori sulla console
-    format="<red>ERROR</red> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <red>{message}</red>",
-    colorize=True
-)
-```
-
----
-
 ### ❌ Errori Kafka Integration
 
 #### Problema: Connection timeout ai broker Kafka
@@ -296,26 +255,48 @@ Run 'job_name' skipped: previous run still active
 Failed to restart service: Access denied
 ```
 
-**Causa**: Permessi insufficienti o NSSM non configurato
+**Causa**: A partire dalla v1.1.9, il riavvio del servizio usa **Hot Restart** che NON richiede privilegi amministratore.
 
-**Soluzioni**:
+**Come funziona Hot Restart**:
 
-1. **Esegui PowerShell come Administrator**
+1. **Il processo Python termina con exit code 0**
+2. **NSSM rileva l'uscita e riavvia automaticamente il servizio** (dopo 5 secondi)
+3. **Tutte le configurazioni vengono ricaricate** dal filesystem
 
-2. **Usa tool diagnostico**:
+**Vantaggi**:
+- ✅ Non richiede privilegi amministratore
+- ✅ Funziona da interfaccia web (pulsante "Riavvia App")
+- ✅ Ricarica tutte le impostazioni (connections.json, config.scheduling.json, .env)
+- ✅ Il servizio rimane in stato "Running" durante il restart
+
+**Soluzioni se il restart fallisce**:
+
+1. **Verifica configurazione NSSM auto-restart**:
    ```powershell
-   .\tools\diagnose_restart.ps1
+   .\nssm.exe get PSTT_Tool AppExit
+   .\nssm.exe get PSTT_Tool AppRestartDelay
+   ```
+   Dovrebbe mostrare:
+   - AppExit Default: Restart
+   - AppRestartDelay: 5000 (ms)
+
+2. **Restart manuale con privilegi admin** (fallback):
+   ```powershell
+   # PowerShell come Administrator
+   Restart-Service PSTT_Tool
    ```
 
-3. **Restart manuale con NSSM**:
+3. **Usa NSSM direttamente** (fallback):
    ```powershell
-   nssm restart PSTT_Tool
+   # PowerShell come Administrator
+   .\nssm.exe restart PSTT_Tool
    ```
 
-4. **Verifica strategie fallback**:
-   - Strategia 1: `Stop-Service` / `Start-Service` (nativo Windows)
-   - Strategia 2: `nssm restart` (se disponibile)
-   - Strategia 3: `nssm stop` + wait + `nssm start`
+4. **Verifica log del restart**:
+   ```powershell
+   # Guarda i log temporanei degli script di restart
+   Get-Content "$env:TEMP\pstt_restart_*.log" | Select-Object -Last 30
+   ```
 
 #### Problema: NSSM configuration issues
 

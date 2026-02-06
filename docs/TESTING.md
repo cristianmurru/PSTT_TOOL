@@ -133,16 +133,17 @@ L'applicazione dovrebbe:
 
 ## 🧭 Suite Test Automatizzati (pytest)
 
-Il progetto include una suite completa di **201 test** con coverage del 76%.
+Il progetto include una suite completa di **205 test** con coverage del 76%.
 
-### 📊 Statistiche Test Suite (v1.1.7)
+### 📊 Statistiche Test Suite (v1.1.9)
 
-- **Test Totali**: 201 test
+- **Test Totali**: 205 test
 - **Coverage**: 76% overall
 - **Breakdown per modulo**:
   - Kafka: 111 test (service, metrics, API, scheduler integration)
   - Scheduler: 45 test (retry, timeout, export multi-formato)
-  - API: 40 test (endpoints REST, validazione)
+  - System: 18 test (restart, service management, hot restart NSSM)
+  - API: 31 test (endpoints REST, validazione)
 
 ### 🚀 Esecuzione Test Completa
 

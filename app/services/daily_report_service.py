@@ -89,7 +89,7 @@ class DailyReportService:
     def _build_html(self, day: date, items: List[Dict]) -> str:
         total = len(items)
         success = sum(1 for h in items if h.get("status") == "success")
-        fail = sum(1 for h in items if h.get("status") == "fail")
+        fail = sum(1 for h in items if h.get("status") in ("fail", "retry_scheduled"))
         avg = 0.0
         durations = [h.get("duration_sec") for h in items if h.get("duration_sec") is not None]
         if durations:

@@ -5,6 +5,8 @@ import subprocess
 import sys
 import os
 import threading
+import tempfile
+import time
 from pathlib import Path
 
 router = APIRouter()
@@ -88,7 +90,7 @@ def _get_nssm_path() -> str | None:
 def _restart_as_service(prefer_nssm: bool = False) -> bool:
     """
     Multi-strategy restart with fallback mechanisms:
-    1. Try Windows native commands (Stop-Service + Start-Service)
+    1. Try Windows native commands (Stop-Service + Start-Service) - saved to disk and launched as detached process
     2. If fails and NSSM available, try: nssm restart
     3. If still fails, try: nssm stop + wait + nssm start
     """
@@ -145,79 +147,181 @@ def _restart_as_service(prefer_nssm: bool = False) -> bool:
         
         # Strategy 1: Windows native commands (preferred - works without NSSM in PATH)
         logger.info("Strategy 1: Trying Windows native Stop-Service/Start-Service")
+        
+        # Create temporary script file to survive parent process termination
+        temp_dir = Path(tempfile.gettempdir())
+        script_file = temp_dir / f"pstt_restart_{int(time.time())}.ps1"
+        log_file = temp_dir / f"pstt_restart_{int(time.time())}.log"
+        
         ps_script = f"""
-            $serviceName = '{name}'
-            
-            # Stop service
-            try {{
-                Stop-Service -Name $serviceName -Force -ErrorAction Stop
-                Write-Host "Service stopped successfully"
-            }} catch {{
-                Write-Error "Stop failed: $_"
-                exit 1
-            }}
-            
-            Start-Sleep -Seconds 3
-            
-            # Start service with retry
-            $maxRetries = 5
-            for ($i = 0; $i -lt $maxRetries; $i++) {{
-                try {{
-                    Start-Service -Name $serviceName -ErrorAction Stop
-                    Write-Host "Service started successfully"
-                    exit 0
-                }} catch {{
-                    Write-Warning "Start attempt $($i+1) failed: $_"
-                    if ($i -lt ($maxRetries - 1)) {{
-                        Start-Sleep -Seconds 2
-                    }}
-                }}
-            }}
-            Write-Error "Failed to start service after $maxRetries attempts"
-            exit 1
+# PSTT Service Restart Script
+# Generated at {time.strftime('%Y-%m-%d %H:%M:%S')}
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Continue'
+$serviceName = '{name}'
+$logFile = '{log_file}'
+
+function Write-Log {{
+    param($Message)
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    "$timestamp - $Message" | Out-File -FilePath $logFile -Append -Encoding utf8
+}}
+
+Write-Log "=== PSTT Service Restart Started ==="
+Write-Log "Service: $serviceName"
+
+# Stop service
+try {{
+    Write-Log "Stopping service..."
+    Stop-Service -Name $serviceName -Force -ErrorAction Stop
+    Write-Log "Service stopped successfully"
+}} catch {{
+    Write-Log "ERROR: Stop failed - $_"
+    exit 1
+}}
+
+Write-Log "Waiting 3 seconds before restart..."
+Start-Sleep -Seconds 3
+
+# Start service with retry
+$maxRetries = 5
+Write-Log "Starting service (max $maxRetries attempts)..."
+for ($i = 0; $i -lt $maxRetries; $i++) {{
+    try {{
+        Start-Service -Name $serviceName -ErrorAction Stop
+        Write-Log "Service started successfully on attempt $($i+1)"
+        Write-Log "=== PSTT Service Restart Completed Successfully ==="
+        Start-Sleep -Seconds 2
+        Remove-Item -Path $logFile -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path '{script_file}' -Force -ErrorAction SilentlyContinue
+        exit 0
+    }} catch {{
+        Write-Log "WARNING: Start attempt $($i+1) failed - $_"
+        if ($i -lt ($maxRetries - 1)) {{
+            Start-Sleep -Seconds 2
+        }}
+    }}
+}}
+
+Write-Log "ERROR: Failed to start service after $maxRetries attempts"
+Write-Log "=== PSTT Service Restart FAILED ==="
+exit 1
         """
         
-        # Execute restart in background
-        subprocess.Popen([
-            "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-            "-Command", ps_script
-        ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
-        
-        logger.info(f"Service restart command sent (native Windows commands) for {name}")
-        _LAST_RESTART_STRATEGY = "native"
-        return True
+        try:
+            # Save script to disk
+            script_file.write_text(ps_script, encoding='utf-8')
+            logger.info(f"Restart script saved to: {script_file}")
+            logger.info(f"Restart log will be at: {log_file}")
+            
+            # Launch as completely detached process
+            # CREATE_NEW_PROCESS_GROUP (0x00000200) + DETACHED_PROCESS (0x00000008) = 0x00000208
+            DETACHED_PROCESS = 0x00000008
+            CREATE_NEW_PROCESS_GROUP = 0x00000200
+            creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+            
+            subprocess.Popen([
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-WindowStyle", "Hidden",
+                "-File", str(script_file)
+            ], 
+            creationflags=creation_flags,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+            )
+            
+            logger.info(f"Service restart launched as detached process for {name}")
+            logger.info("Check restart log if service doesn't start within 30 seconds")
+            _LAST_RESTART_STRATEGY = "native"
+            return True
+            
+        except Exception as script_error:
+            logger.error(f"Failed to create/launch restart script: {script_error}")
+            # Clean up
+            if script_file.exists():
+                script_file.unlink()
+            # Fall through to Strategy 2
         
     except Exception as e:
-        logger.warning(f"Strategy 1 failed: {e}")
-        
+        logger.warning(f"Strategy 1 exception: {e}")
+    
+    # If we reach here, Strategy 1 failed - try Strategy 2
+    logger.warning("Strategy 1 failed, attempting Strategy 2")
+    try:
+        name = _resolve_service_name()
         # Strategy 2: NSSM restart (if available)
         nssm_path = _get_nssm_path()
         if nssm_path:
             try:
-                logger.info("Strategy 2: Trying NSSM restart command")
-                ps_restart = f"& '{nssm_path}' restart {name}"
+                logger.info(f"Strategy 2: Trying NSSM restart command (nssm path: {nssm_path})")
+                
+                # Launch NSSM as detached process
+                DETACHED_PROCESS = 0x00000008
+                CREATE_NEW_PROCESS_GROUP = 0x00000200
+                creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                
                 subprocess.Popen([
-                    "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                    "-Command", ps_restart
-                ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                    nssm_path, "restart", name
+                ], 
+                creationflags=creation_flags,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+                )
                 logger.info(f"Service restart via NSSM sent for {name}")
                 _LAST_RESTART_STRATEGY = "nssm-restart"
                 return True
             except Exception as e2:
-                logger.warning(f"Strategy 2 failed: {e2}")
+                logger.error(f"Strategy 2 failed: {e2}")
                 
                 # Strategy 3: NSSM stop + start (last resort)
                 try:
-                    logger.info("Strategy 3: Trying NSSM stop + start sequence")
+                    logger.info(f"Strategy 3: Trying NSSM stop + start sequence (nssm path: {nssm_path})")
+                    
+                    # Create temporary script for NSSM stop+start
+                    temp_dir = Path(tempfile.gettempdir())
+                    script_file = temp_dir / f"pstt_nssm_restart_{int(time.time())}.ps1"
+                    
                     ps_nssm = f"""
-                        & '{nssm_path}' stop {name}
-                        Start-Sleep -Seconds 3
-                        & '{nssm_path}' start {name}
+# NSSM Stop+Start Sequence
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Continue'
+
+Write-Host "Stopping service via NSSM..."
+& '{nssm_path}' stop {name}
+Start-Sleep -Seconds 3
+
+Write-Host "Starting service via NSSM..."
+& '{nssm_path}' start {name}
+
+Start-Sleep -Seconds 2
+Remove-Item -Path '{script_file}' -Force -ErrorAction SilentlyContinue
                     """
+                    
+                    script_file.write_text(ps_nssm, encoding='utf-8')
+                    logger.info(f"NSSM restart script saved to: {script_file}")
+                    
+                    # Launch as detached process
+                    DETACHED_PROCESS = 0x00000008
+                    CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    creation_flags = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+                    
                     subprocess.Popen([
-                        "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                        "-Command", ps_nssm
-                    ], creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0)
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-ExecutionPolicy", "Bypass",
+                        "-WindowStyle", "Hidden",
+                        "-File", str(script_file)
+                    ],
+                    creationflags=creation_flags,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                    )
+                    
                     logger.info(f"Service restart via NSSM stop/start sent for {name}")
                     _LAST_RESTART_STRATEGY = "nssm-stopstart"
                     return True
@@ -229,6 +333,10 @@ def _restart_as_service(prefer_nssm: bool = False) -> bool:
             logger.error("NSSM not available for fallback, restart failed")
             _LAST_RESTART_STRATEGY = "none"
             return False
+    except Exception as outer_e:
+        logger.error(f"Outer exception in Strategy 2/3: {outer_e}")
+        _LAST_RESTART_STRATEGY = "none"
+        return False
 
 
 def _schedule_terminal_restart(delay_sec: int = 2):
@@ -256,13 +364,48 @@ def _exit_process(delay_sec: int = 1):
     t.start()
 
 
+def _schedule_hot_restart(delay_sec: int = 2):
+    """
+    Riavvia il processo Python terminandolo con exit code 0.
+    NSSM rileverà l'uscita e riavvierà automaticamente il servizio.
+    Funziona senza privilegi amministratore.
+    """
+    def _do_hot_restart():
+        try:
+            logger.info("Executing hot restart - terminating process for NSSM auto-restart")
+            logger.info("NSSM will automatically restart the service in 5 seconds")
+            # Exit with code 0 so NSSM restarts the service
+            # NSSM is configured with AppRestartDelay=5000ms
+            os._exit(0)
+        except Exception as e:
+            logger.error(f"Hot restart failed: {e}")
+            os._exit(1)
+    
+    logger.info(f"Hot restart scheduled in {delay_sec} seconds (NSSM will auto-restart)")
+    t = threading.Timer(delay_sec, _do_hot_restart)
+    t.daemon = True
+    t.start()
+
+
 @router.post("/restart", tags=["system"], summary="Riavvia l'applicazione")
-def restart_app(prefer_nssm: bool = False, strategy: str | None = None):
+def restart_app(prefer_nssm: bool = False, strategy: str | None = None, hot_restart: bool = True):
     """Prova a riavviare l'app.
+    - hot_restart=True (default): Riavvia solo il processo Python senza toccare il servizio Windows (non richiede admin)
+    - hot_restart=False: Tenta di riavviare il servizio Windows (richiede privilegi amministratore)
     - Se eseguita come servizio NSSM, effettua il restart del servizio.
     - Altrimenti, pianifica un riavvio avviando start_pstt.bat e terminando il processo corrente.
     """
     try:
+        # Hot restart: riavvia solo il processo Python (funziona anche senza admin)
+        if hot_restart:
+            logger.info("Hot restart richiesto: riavvio del processo Python")
+            _schedule_hot_restart(delay_sec=2)
+            return JSONResponse(content={
+                "success": True, 
+                "mode": "hot_restart", 
+                "message": "Riavvio processo Python in corso (2 secondi)..."
+            })
+        
         # Prefer NSSM if requested by query or environment
         env_val = os.environ.get("PSTT_PREFER_NSSM", "").strip().lower()
         env_prefer = env_val in ("1", "true", "yes", "2", "nssm", "restart")
@@ -309,3 +452,34 @@ def nssm_path():
     except Exception as e:
         logger.error(f"Read nssm path fallito: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@router.get("/service/restart-logs", tags=["system"], summary="Ultimi log di restart del servizio")
+def restart_logs():
+    """Restituisce gli ultimi log di restart generati dagli script temporanei"""
+    try:
+        temp_dir = Path(tempfile.gettempdir())
+        log_files = sorted(temp_dir.glob("pstt_restart_*.log"), key=lambda p: p.stat().st_mtime, reverse=True)
+        
+        logs = []
+        for log_file in log_files[:3]:  # Ultimi 3 restart
+            try:
+                content = log_file.read_text(encoding='utf-8')
+                logs.append({
+                    "file": log_file.name,
+                    "modified": log_file.stat().st_mtime,
+                    "content": content
+                })
+            except Exception:
+                pass
+        
+        return JSONResponse(content={
+            "success": True,
+            "count": len(logs),
+            "logs": logs,
+            "temp_dir": str(temp_dir)
+        })
+    except Exception as e:
+        logger.error(f"Read restart logs fallito: {e}")
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+

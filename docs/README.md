@@ -272,14 +272,20 @@ Il sistema esegue query in modo programmato tramite APScheduler (con AsyncIOExec
 ## 🔁 Riavvio servizio
 
 - Endpoint: `POST /api/system/restart`.
-- Comportamento multi-strategia con fallback automatico:
-   - **Strategia 1 (preferita)**: Comandi Windows nativi (`Stop-Service`/`Start-Service`) - non richiede NSSM nel PATH
-   - **Strategia 2 (fallback)**: `nssm restart` se disponibile - quando comandi nativi falliscono per permessi/policy
-   - **Strategia 3 (ultimo resort)**: `nssm stop` + wait + `nssm start` - massimo controllo sulla sequenza
-   - In modalità terminale: viene avviato `start_pstt.bat` e il processo corrente termina
-   - La UI mostra un overlay informativo con monitoraggio stato (down/up) tramite polling su `/health`
-- **Robustezza**: Il sistema prova automaticamente strategie alternative in caso di fallimento (utile in ambienti enterprise con policy restrittive)
-- Script diagnostico: `tools/diagnose_restart.ps1` per troubleshooting problemi restart
+- **Hot Restart (default)**: Terminazione processo con exit code 0 → NSSM auto-restart (parametro `hot_restart=true`)
+  - ✅ **Nessun privilegio amministratore richiesto**
+  - ✅ Riavvio completo del processo Python (~7 secondi downtime: 2s delay + 5s NSSM)
+  - ✅ Ricaricamento automatico di tutte le configurazioni (connections.json, .env, schedulazioni, moduli Python)
+  - ⚙️ Richiede configurazione NSSM: `AppExit Default Restart`, `AppRestartDelay 5000`
+- **Fallback classico** (parametro `hot_restart=false`): Strategie Windows/NSSM con privilegi admin
+  - Script PowerShell salvato su disco come processo detached (sopravvive al parent)
+  - Strategia 1: Comandi Windows nativi (`Stop-Service`/`Start-Service`)
+  - Strategia 2: `nssm restart` se disponibile
+  - Strategia 3: `nssm stop` + wait + `nssm start`
+- **Modalità terminale**: Avvia `start_pstt.bat` e termina il processo corrente
+- **UI**: Overlay informativo con monitoraggio stato (down/up) tramite polling su `/health`
+- **Log diagnostici**: `GET /api/system/service/restart-logs` per visualizzare log restart da %TEMP%
+- **Troubleshooting**: Vedi [TROUBLESHOOTING.md](TROUBLESHOOTING.md) per problemi restart
 
 - Output: i file vengono salvati in `Export/` con formato e nome generati dalla logica di rendering: `{query_name}_{YYYY-MM-DD}_{timestamp}.{ext}`. È possibile personalizzare il template di output nella schedulazione (es. includere nome connessione, filtri, ecc.).
 
@@ -486,7 +492,7 @@ I log sono salvati in `logs/`:
    - `POST /api/settings/env`
  - Chiavi supportate: `smtp_host`, `smtp_port`, `smtp_user`, `smtp_password`, `smtp_from`, `DAILY_REPORT_ENABLED`, `DAILY_REPORT_CRON`, `DAILY_REPORTS_HOUR`, `DAILY_REPORT_RECIPIENTS`, `DAILY_REPORT_CC`, `DAILY_REPORT_SUBJECT`, `DAILY_REPORT_TAIL_LINES`, `scheduler_query_timeout_sec`, `scheduler_write_timeout_sec`.
  - Scheduler Retry: `scheduler_retry_enabled`, `scheduler_retry_delay_minutes`, `scheduler_retry_max_attempts` (visibili e modificabili in `/settings`).
- - Riavvio dall’UI: pulsante “Riavvia App” con overlay che mostra la fase di riavvio (down/up) tramite polling su `/health`. Backend: `POST /api/system/restart` (riavvio come servizio se disponibile, altrimenti pianificazione rilancio via `start_pstt.bat`).
+ - Riavvio dall'UI: pulsante "Riavvia App" con overlay che mostra la fase di riavvio (down/up) tramite polling su `/health`. Backend: `POST /api/system/restart` (default: **hot restart** con NSSM auto-restart, nessun privilegio admin richiesto; fallback: strategie Windows/NSSM con privilegi admin o `start_pstt.bat` in modalità terminale).
  - Badge ENV: configurare `app_environment` in `.env` per mostrare l’etichetta ambiente (`SVILUPPO`, `COLLAUDO`, `PRODUZIONE`) in alto a destra della navbar.
 
 ## 📧 Report giornaliero schedulazioni
