@@ -54,7 +54,8 @@ class TestRestartAsService:
         assert mock_popen.called
         call_args = mock_popen.call_args[0][0]
         assert "powershell" in call_args[0].lower()
-        assert "Stop-Service" in call_args[-1]  # Verifica script PowerShell
+        # Ora usa -File con percorso script temporaneo invece di -Command inline
+        assert "-File" in call_args or "-file" in [x.lower() for x in call_args]
         
     def test_restart_as_service_when_service_not_exists(self, mock_service_not_exists, mock_popen):
         """Verifica che _restart_as_service restituisca False quando servizio non esiste."""
@@ -70,9 +71,46 @@ class TestRestartAsService:
 class TestRestartEndpoint:
     """Test per endpoint POST /api/system/restart - verifica branching service vs terminal."""
     
+    def test_restart_endpoint_hot_restart_default(self, mock_service_exists, mock_popen):
+        """
+        Verifica che hot_restart=True (default) usi _schedule_hot_restart.
+        Questo è il comportamento predefinito per riavvio senza privilegi admin.
+        """
+        from app.main import app
+        
+        client = TestClient(app)
+        
+        # Mock _schedule_hot_restart per verificare che venga chiamato
+        with patch("app.api.system._schedule_hot_restart") as mock_hot_restart:
+            response = client.post("/api/system/restart")
+        
+        # Verifica risposta API
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["mode"] == "hot_restart"
+        
+        # VERIFICA: _schedule_hot_restart DEVE essere chiamato (default behavior)
+        assert mock_hot_restart.called
+        mock_hot_restart.assert_called_once_with(delay_sec=2)
+    
+    def test_restart_endpoint_hot_restart_explicit_true(self, mock_service_exists, mock_popen):
+        """Verifica che hot_restart=true esplicitamente usi _schedule_hot_restart."""
+        from app.main import app
+        
+        client = TestClient(app)
+        
+        with patch("app.api.system._schedule_hot_restart") as mock_hot_restart:
+            response = client.post("/api/system/restart?hot_restart=true")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["mode"] == "hot_restart"
+        assert mock_hot_restart.called
+    
     def test_restart_endpoint_service_mode_does_not_call_exit(self, mock_service_exists, mock_popen):
         """
-        CRITICAL TEST: Verifica che in modalità service NON venga chiamato _exit_process.
+        CRITICAL TEST: Verifica che con hot_restart=false in modalità service NON venga chiamato _exit_process.
         Questo previene il loop di restart in produzione.
         """
         from app.main import app
@@ -82,7 +120,8 @@ class TestRestartEndpoint:
         # Mock _exit_process per verificare che NON venga chiamato
         with patch("app.api.system._exit_process") as mock_exit:
             with patch("app.api.system._schedule_terminal_restart") as mock_terminal:
-                response = client.post("/api/system/restart")
+                with patch("app.api.system._schedule_hot_restart") as mock_hot:
+                    response = client.post("/api/system/restart?hot_restart=false")
         
         # Verifica risposta API
         assert response.status_code == 200
@@ -95,9 +134,12 @@ class TestRestartEndpoint:
         
         # Terminal restart NON deve essere schedulato in service mode
         assert not mock_terminal.called
+        
+        # Hot restart NON deve essere usato se esplicitamente disabilitato
+        assert not mock_hot.called
     
     def test_restart_endpoint_terminal_mode_calls_exit(self, mock_service_not_exists):
-        """Verifica che in modalità terminal vengano chiamati _schedule_terminal_restart e _exit_process."""
+        """Verifica che in modalità terminal con hot_restart=false vengano chiamati _schedule_terminal_restart e _exit_process."""
         from app.main import app
         
         client = TestClient(app)
@@ -105,7 +147,8 @@ class TestRestartEndpoint:
         # Mock delle funzioni di restart terminale
         with patch("app.api.system._exit_process") as mock_exit:
             with patch("app.api.system._schedule_terminal_restart") as mock_terminal:
-                response = client.post("/api/system/restart")
+                # Usa hot_restart=false per testare modalità terminal classica
+                response = client.post("/api/system/restart?hot_restart=false")
         
         # Verifica risposta API
         assert response.status_code == 200
@@ -208,6 +251,52 @@ class TestExitProcess:
             args = mock_timer.call_args
             assert args[0][0] == 3  # delay_sec
             
+            # Verifica che timer sia stato avviato
+            mock_timer_instance.start.assert_called_once()
+
+
+class TestScheduleHotRestart:
+    """Test per _schedule_hot_restart() - verifica hot restart NSSM."""
+    
+    def test_schedule_hot_restart_creates_timer(self):
+        """Verifica che _schedule_hot_restart crei un Timer per restart ritardato."""
+        from app.api.system import _schedule_hot_restart
+        
+        with patch("threading.Timer") as mock_timer:
+            mock_timer_instance = Mock()
+            mock_timer.return_value = mock_timer_instance
+            
+            _schedule_hot_restart(delay_sec=2)
+            
+            # Verifica che Timer sia stato creato con delay corretto
+            mock_timer.assert_called_once()
+            args = mock_timer.call_args
+            assert args[0][0] == 2  # delay_sec
+            
+            # Verifica che timer sia stato avviato
+            mock_timer_instance.start.assert_called_once()
+    
+    def test_hot_restart_exits_with_code_zero(self):
+        """Verifica che hot restart esca con codice 0 per trigger NSSM auto-restart."""
+        from app.api.system import _schedule_hot_restart
+        
+        with patch("threading.Timer") as mock_timer:
+            mock_timer_instance = Mock()
+            mock_timer.return_value = mock_timer_instance
+            
+            with patch("os._exit") as mock_os_exit:
+                # Ottieni la funzione callback del timer
+                _schedule_hot_restart(delay_sec=1)
+                
+                # Estrai la funzione passata al Timer
+                callback_func = mock_timer.call_args[0][1]
+                
+                # Esegui il callback
+                callback_func()
+                
+                # Verifica che os._exit sia stato chiamato con codice 0
+                mock_os_exit.assert_called_once_with(0)
+            
             # Verifica che start() sia stato chiamato
             mock_timer_instance.start.assert_called_once()
             
@@ -241,53 +330,45 @@ class TestIntegrationRestartFlow:
     
     def test_restart_flow_service_mode_end_to_end(self, mock_service_exists, mock_popen):
         """
-        Test end-to-end: verifica flusso completo restart da UI in service mode.
-        Simula: UI click → API call → Native Windows service restart → NO exit process.
+        Test end-to-end: verifica flusso completo restart da UI in service mode con hot_restart.
+        Simula: UI click → API call → Hot restart (termina processo per NSSM auto-restart).
         """
         from app.main import app
         
         client = TestClient(app)
         
-        with patch("app.api.system._exit_process") as mock_exit:
-            # Chiamata API restart (simula click UI)
+        with patch("app.api.system._schedule_hot_restart") as mock_hot_restart:
+            # Chiamata API restart (simula click UI) - default usa hot_restart=true
             response = client.post("/api/system/restart")
             
             # Verifica successo
             assert response.status_code == 200
-            assert response.json()["mode"] == "service"
+            assert response.json()["mode"] == "hot_restart"
             
-            # Verifica che PowerShell restart sia stato invocato
-            assert mock_popen.called
-            popen_cmd = mock_popen.call_args[0][0]
-            assert "powershell" in popen_cmd[0].lower()
-            assert "Stop-Service" in popen_cmd[-1]
-            
-            # VERIFICA CRITICA: NO exit process in service mode
-            assert not mock_exit.called
+            # Verifica che hot restart sia stato schedulato
+            assert mock_hot_restart.called
+            mock_hot_restart.assert_called_once_with(delay_sec=2)
     
     def test_restart_flow_terminal_mode_end_to_end(self, mock_service_not_exists):
         """
-        Test end-to-end: verifica flusso completo restart da terminale.
-        Simula: Terminal → API call → Schedule batch → Exit process.
+        Test end-to-end: verifica flusso completo restart da terminale con hot_restart.
+        Simula: Terminal → API call → Hot restart (default anche per terminal mode).
         """
         from app.main import app
         
         client = TestClient(app)
         
-        with patch("app.api.system._exit_process") as mock_exit:
-            with patch("app.api.system._schedule_terminal_restart") as mock_terminal:
-                # Chiamata API restart (terminale)
-                response = client.post("/api/system/restart")
-                
-                # Verifica successo
-                assert response.status_code == 200
-                assert response.json()["mode"] == "terminal"
-                
-                # Verifica terminal restart schedulato
-                assert mock_terminal.called
-                
-                # Verifica exit process chiamato
-                assert mock_exit.called
+        with patch("app.api.system._schedule_hot_restart") as mock_hot_restart:
+            # Chiamata API restart (terminale) - default usa hot_restart=true
+            response = client.post("/api/system/restart")
+            
+            # Verifica successo
+            assert response.status_code == 200
+            assert response.json()["mode"] == "hot_restart"
+            
+            # Verifica hot restart schedulato
+            assert mock_hot_restart.called
+            mock_hot_restart.assert_called_once_with(delay_sec=2)
 
 
 class TestNSSMConfiguration:
