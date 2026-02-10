@@ -18,6 +18,11 @@ from app.models.queries import ExportRequest
 import io
 import pandas as pd
 from datetime import datetime
+from app.core.config import get_settings
+
+
+class UpdateQueryPayload(dict):
+    pass
 
 
 router = APIRouter()
@@ -106,6 +111,71 @@ async def execute_query(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Errore interno nell'esecuzione della query"
         )
+
+
+@router.put("/{filename}/update", summary="Aggiorna contenuto query")
+async def update_query(filename: str, payload: Dict[str, Any], query_service: QueryService = Depends(get_query_service)):
+    try:
+        # Block edits in production environment
+        try:
+            settings = get_settings()
+            env = (getattr(settings, 'app_environment', '') or '').lower()
+            if 'produzione' in env or 'production' in env:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Modifica disabilitata in ambiente di Produzione")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
+        new_sql = str(payload.get('sql_content', ''))
+        if not new_sql:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="sql_content mancante")
+        ok = query_service.save_query(filename, new_sql)
+        if not ok:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Salvataggio fallito")
+        info = query_service.get_query(filename)
+        return {"success": True, "query": info}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Errore update query {filename}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Errore interno aggiornamento query")
+
+
+@router.post("/{filename}/format", summary="Formatta SQL (visualizzazione)")
+async def format_query(filename: str, payload: Dict[str, Any], query_service: QueryService = Depends(get_query_service)):
+    try:
+        sql = str(payload.get('sql_content', ''))
+        formatted = query_service.format_sql_basic(sql)
+        return {"formatted": formatted}
+    except Exception as e:
+        logger.error(f"Errore format SQL {filename}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Errore interno formatting")
+
+
+@router.post("/{filename}/suggest", summary="Suggerimenti ottimizzazione SQL")
+async def suggest_query(filename: str, payload: Dict[str, Any], query_service: QueryService = Depends(get_query_service)):
+    try:
+        sql = str(payload.get('sql_content', ''))
+        conn = str(payload.get('connection_name', ''))
+        suggestions = query_service.suggest_optimizations(sql, conn)
+        # Include lint issues for better guidance
+        issues = query_service.lint_sql(sql, conn)
+        return {"suggestions": suggestions, "issues": issues}
+    except Exception as e:
+        logger.error(f"Errore suggest SQL {filename}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Errore interno suggerimenti")
+
+
+@router.post("/{filename}/lint", summary="Verifica sintattica SQL")
+async def lint_query(filename: str, payload: Dict[str, Any], query_service: QueryService = Depends(get_query_service)):
+    try:
+        sql = str(payload.get('sql_content', ''))
+        conn = str(payload.get('connection_name', ''))
+        issues = query_service.lint_sql(sql, conn)
+        return {"issues": issues}
+    except Exception as e:
+        logger.error(f"Errore lint SQL {filename}: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Errore interno lint")
 
 
 @router.post("/export", summary="Export query results (server-side)")

@@ -144,6 +144,9 @@ class Settings(BaseSettings):
     # Scheduler settings
     scheduler_timezone: str = "Europe/Rome"
     daily_reports_hour: int = 6  # Ora di esecuzione report giornalieri
+    # Robustezza scheduler: coalesce (accorpa esecuzioni perse) e finestra misfire (tolleranza in secondi)
+    scheduler_coalesce_enabled: bool = True
+    scheduler_misfire_grace_time_sec: int = 900
     # Daily report configurazione (recap giornaliero schedulazioni)
     daily_report_enabled: bool = False
     daily_report_cron: str | None = None  # es. "0 19 * * *"; se assente usa daily_reports_hour
@@ -190,6 +193,8 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     # Timeout esecuzione query schedulatore (secondi)
     scheduler_query_timeout_sec: int = 900  # default 15 minuti
+    # Timeout scrittura export (secondi) - se non configurato, il servizio usa un default interno
+    scheduler_write_timeout_sec: int = 180
     # Scheduler retry settings
     scheduler_retry_enabled: bool = True
     scheduler_retry_delay_minutes: int = 30

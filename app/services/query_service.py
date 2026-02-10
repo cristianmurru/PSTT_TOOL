@@ -329,6 +329,162 @@ class QueryService:
             s = s[:-1].rstrip()
         return s
 
+    def save_query(self, filename: str, new_content: str) -> bool:
+        """Salva il contenuto della query nel file corrispondente (ricerca ricorsiva per filename)."""
+        try:
+            for sql_file in self.settings.query_dir.rglob(filename):
+                if sql_file.name.lower() == filename.lower():
+                    # Usa UTF-8 e crea backup semplice
+                    try:
+                        backup = sql_file.with_suffix('.bak')
+                        if sql_file.exists():
+                            sql_file.replace(backup)
+                            # ripristina bak originale se write fallisce
+                        with open(sql_file, 'w', encoding='utf-8') as f:
+                            f.write(new_content)
+                        return True
+                    except Exception as e:
+                        logger.error(f"Errore salvataggio file {sql_file}: {e}")
+                        # prova a ripristinare backup
+                        try:
+                            if backup.exists():
+                                backup.replace(sql_file)
+                        except Exception:
+                            pass
+                        return False
+            logger.error(f"File query non trovato per salvataggio: {filename}")
+            return False
+        except Exception as e:
+            logger.error(f"Errore save_query {filename}: {e}")
+            return False
+
+    def format_sql_basic(self, sql: str) -> str:
+        """Formatter minimale: normalizza spazi, uppercase parole chiave comuni, indentazione semplice."""
+        if not isinstance(sql, str):
+            return sql
+        s = sql.replace('\r\n', '\n').replace('\r', '\n')
+        lines = [ln.strip() for ln in s.split('\n')]
+        # Uppercase parole chiave al inizio riga
+        keywords = [
+            'select', 'from', 'where', 'group by', 'order by', 'join', 'left join', 'right join',
+            'inner join', 'outer join', 'union', 'with', 'having', 'limit', 'offset', 'insert',
+            'update', 'delete'
+        ]
+        def upkw(line: str) -> str:
+            l = line.strip()
+            low = l.lower()
+            for kw in keywords:
+                if low.startswith(kw):
+                    return kw.upper() + l[len(kw):]
+            return l
+        lines = [upkw(ln) for ln in lines]
+        # Aggiungi nuove linee prima di parole chiave importanti per leggibilità
+        joined = '\n'.join(lines)
+        for kw in [' FROM ', ' WHERE ', ' GROUP BY ', ' ORDER BY ', ' HAVING ', ' JOIN ', ' UNION ']:
+            joined = re.sub(kw, '\n' + kw.strip() + ' ', joined, flags=re.IGNORECASE)
+        # Indentazione semplice: aggiungi due spazi alle linee che seguono SELECT fino a FROM
+        formatted_lines = []
+        indent = False
+        for ln in joined.split('\n'):
+            low = ln.strip().lower()
+            if low.startswith('select'):
+                indent = True
+                formatted_lines.append(ln)
+                continue
+            if low.startswith('from'):
+                indent = False
+            if indent and ln.strip():
+                formatted_lines.append('  ' + ln)
+            else:
+                formatted_lines.append(ln)
+        out = '\n'.join(formatted_lines)
+        # Rimuovi terminatori finali superflui
+        out = self._sanitize_sql_for_oracle(out)
+        return out
+
+    def suggest_optimizations(self, sql: str, connection_name: str | None) -> List[str]:
+        """Genera suggerimenti di ottimizzazione in base al contenuto SQL e al tipo DB della connessione."""
+        suggestions: List[str] = []
+        try:
+            conn = self.connection_service.get_connection(connection_name) if connection_name else None
+            db_type = (conn.db_type.lower() if conn else '').lower()
+            s = (sql or '').lower()
+            if 'select *' in s:
+                suggestions.append("Evita SELECT *: specifica le colonne necessarie.")
+            if ' where ' in s and ('like' in s or 'upper(' in s or 'lower(' in s):
+                suggestions.append("Evita funzioni sulla colonna in WHERE/LIKE: usa colonne normalizzate o indici dedicati.")
+            if ' in (' in s:
+                suggestions.append("Valuta EXISTS al posto di IN per subquery pesanti.")
+            if ' join ' in s and ' on ' in s and ' where ' in s:
+                suggestions.append("Controlla selettività delle condizioni JOIN/WHERE e presenza di indici coerenti.")
+            if re.search(r'order\s+by', s):
+                suggestions.append("Usa indici che supportino ORDER BY oppure limita righe prima di ordinare.")
+            if re.search(r'between\s+\S+\s+and\s+\S+', s):
+                suggestions.append("Per range ampi, valuta partizionamento o filtri più selettivi.")
+            if db_type == 'oracle':
+                suggestions.append("Oracle: assicurati di rimuovere ';' finali e valuta HINT /*+ INDEX(...) */ dove appropriato.")
+            if db_type == 'postgresql':
+                suggestions.append("PostgreSQL: verifica piani con EXPLAIN ANALYZE e indici su colonne di filtro.")
+            if not suggestions:
+                suggestions.append("La query sembra semplice; verifica comunque piani di esecuzione e indici.")
+        except Exception as e:
+            logger.error(f"Errore generazione suggerimenti: {e}")
+        return suggestions
+
+    def lint_sql(self, sql: str, connection_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Verifica sintattica base e potenziali problemi senza eseguire la query.
+        Restituisce una lista di dict: {"type": "error|warning", "message": str}
+        """
+        issues: List[Dict[str, Any]] = []
+        try:
+            s = (sql or '')
+            low = s.lower()
+            # Empty or trivial
+            if not s.strip():
+                issues.append({"type": "error", "message": "SQL vuoto"})
+                return issues
+            # Basic structure checks
+            is_select = low.strip().startswith('select') or low.strip().startswith('with')
+            if is_select:
+                if ' from ' not in f" {low} ":
+                    issues.append({"type": "error", "message": "SELECT senza FROM"})
+                # ORDER BY without select columns is allowed, but warn if '*' and no index hints
+            # Parentheses balance
+            if s.count('(') != s.count(')'):
+                issues.append({"type": "error", "message": "Parentesi non bilanciate"})
+            # Quotes balance (simple heuristic)
+            if s.count("'") % 2 != 0:
+                issues.append({"type": "error", "message": "Apici singoli non bilanciati"})
+            # Trailing terminators
+            if s.rstrip().endswith(';') or s.rstrip().endswith('/'):
+                issues.append({"type": "warning", "message": "Rimuovi terminatori finali (';' o '/')"})
+            # Suspicious ORDER BY on non-selected columns when using '*'
+            try:
+                if is_select and 'select *' in low and ' order by ' in low:
+                    issues.append({"type": "warning", "message": "Usa colonne esplicite con ORDER BY per chiarezza e indici"})
+            except Exception:
+                pass
+            # Potential schema/table check heuristic
+            m_from = re.search(r'from\s+([a-z0-9_\.]+)', low)
+            if m_from:
+                table_ref = m_from.group(1)
+                if '.' not in table_ref:
+                    issues.append({"type": "warning", "message": "Specifica schema.tabella per evitare ambiguità"})
+            # Oracle specific
+            try:
+                conn = self.connection_service.get_connection(connection_name) if connection_name else None
+                db_type = (conn.db_type.lower() if conn else '').lower()
+                if db_type == 'oracle':
+                    # Warn common Oracle pitfalls
+                    if 'rownum' in low and 'order by' in low:
+                        issues.append({"type": "warning", "message": "ROWNUM con ORDER BY può produrre ordinamenti inattesi"})
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error(f"Errore lint SQL: {e}")
+            issues.append({"type": "error", "message": "Errore interno nel lint"})
+        return issues
+
     def execute_query(self, request: QueryExecutionRequest) -> QueryExecutionResult:
         start_time = time.time()
         try:
@@ -373,7 +529,7 @@ class QueryService:
             except Exception:
                 pass
             if len(steps) == 1 and steps[0]["description"] == "Query unica":
-                # Query semplice, esegui come prima
+                # Query semplice, ma gestisci comunque multi-statement (ALTER SESSION; WITH/SELECT; ecc.)
                 with engine.connect() as conn:
                     # Applica LIMIT solo se è stato esplicitamente fornito un valore numerico
                     if request.limit is not None and request.limit > 0:
@@ -391,31 +547,106 @@ class QueryService:
                             f.write(sql_to_execute)
                     except Exception as e:
                         logger.error(f"Impossibile salvare la query in tmp.txt: {e}")
-                    result = conn.execute(text(sql_to_execute))
-                    rows = result.fetchall()
-                    column_names = list(result.keys()) if result.keys() else []
-                    data = []
-                    for row in rows:
-                        row_dict = {}
-                        for i, col_name in enumerate(column_names):
-                            value = row[i] if i < len(row) else None
-                            if isinstance(value, datetime):
-                                row_dict[col_name] = value.isoformat()
-                            else:
-                                row_dict[col_name] = value
-                        data.append(row_dict)
-                    execution_time = (time.time() - start_time) * 1000
-                    logger.info(f"Query {request.query_filename} eseguita con successo: {len(data)} righe in {execution_time:.2f}ms")
-                    return QueryExecutionResult(
-                        query_filename=request.query_filename,
-                        connection_name=request.connection_name,
-                        success=True,
-                        execution_time_ms=execution_time,
-                        row_count=len(data),
-                        column_names=column_names,
-                        data=data,
-                        parameters_used=request.parameters
-                    )
+
+                    # Suddividi per ';' ed esegui ogni statement separatamente, restituendo l'ultimo SELECT
+                    last_select_result: Optional[QueryExecutionResult] = None
+                    step_sql_normalized = sql_to_execute.strip()
+                    statements = [s.strip() for s in re.split(r";\s*(?=\n|$)|;", step_sql_normalized) if s.strip()]
+                    for stmt in statements:
+                        stmt = stmt.rstrip().rstrip(';').strip()
+                        if not stmt:
+                            continue
+                        is_select = stmt.lower().startswith("select") or stmt.lower().startswith("with")
+                        try:
+                            result = conn.execute(text(stmt))
+                            # Per Oracle, commit dopo DML/DDL
+                            if db_type == "oracle" and not is_select:
+                                try:
+                                    conn.commit()
+                                except Exception:
+                                    pass
+                        except Exception as e:
+                            execution_time = (time.time() - start_time) * 1000
+                            err_msg = f"Statement execute failed: {stmt} - Error: {str(e)}"
+                            logger.error(err_msg)
+                            # Diagnostica
+                            try:
+                                stmt_preview = stmt[:100].replace('\n', ' ')
+                                diag_file = tmp_dir / "tmp_diagnostics.txt"
+                                with open(diag_file, 'a', encoding='utf-8') as df:
+                                    df.write(f"STATEMENT_EXECUTE_FAILED | {stmt_preview} | {str(e)}\n")
+                            except Exception:
+                                pass
+                            return QueryExecutionResult(
+                                query_filename=request.query_filename,
+                                connection_name=request.connection_name,
+                                success=False,
+                                execution_time_ms=execution_time,
+                                row_count=0,
+                                error_message=err_msg,
+                                parameters_used=request.parameters
+                            )
+                        if is_select:
+                            try:
+                                rows = result.fetchall()
+                                column_names = list(result.keys()) if result.keys() else []
+                                data = []
+                                for row in rows:
+                                    row_dict = {}
+                                    for i, col_name in enumerate(column_names):
+                                        value = row[i] if i < len(row) else None
+                                        if isinstance(value, datetime):
+                                            row_dict[col_name] = value.isoformat()
+                                        else:
+                                            row_dict[col_name] = value
+                                    data.append(row_dict)
+                                execution_time = (time.time() - start_time) * 1000
+                                last_select_result = QueryExecutionResult(
+                                    query_filename=request.query_filename,
+                                    connection_name=request.connection_name,
+                                    success=True,
+                                    execution_time_ms=execution_time,
+                                    row_count=len(data),
+                                    column_names=column_names,
+                                    data=data,
+                                    parameters_used=request.parameters
+                                )
+                            except Exception as e:
+                                execution_time = (time.time() - start_time) * 1000
+                                stmt_preview = stmt[:100].replace('\n', ' ')
+                                logger.error(f"Statement fetch failed: {stmt_preview} - Error: {str(e)}")
+                                try:
+                                    diag_file = tmp_dir / "tmp_diagnostics.txt"
+                                    with open(diag_file, 'a', encoding='utf-8') as df:
+                                        df.write(f"STATEMENT_FETCH_FAILED | {stmt_preview} | {str(e)}\n")
+                                except Exception:
+                                    pass
+                                return QueryExecutionResult(
+                                    query_filename=request.query_filename,
+                                    connection_name=request.connection_name,
+                                    success=False,
+                                    execution_time_ms=execution_time,
+                                    row_count=0,
+                                    error_message=f"Statement fetch failed: {str(e)}",
+                                    parameters_used=request.parameters
+                                )
+
+                    # Se esiste un risultato SELECT, restituiscilo; altrimenti OK senza righe
+                    if last_select_result:
+                        logger.info(f"Query {request.query_filename} eseguita con successo: {last_select_result.row_count} righe")
+                        return last_select_result
+                    else:
+                        execution_time = (time.time() - start_time) * 1000
+                        return QueryExecutionResult(
+                            query_filename=request.query_filename,
+                            connection_name=request.connection_name,
+                            success=True,
+                            execution_time_ms=execution_time,
+                            row_count=0,
+                            column_names=[],
+                            data=[],
+                            parameters_used=request.parameters
+                        )
             else:
                 # Multi-step
                 last_result = None
@@ -655,7 +886,11 @@ class QueryService:
                     param_values[param.name] = param.default_value
             # Poi sovrascrivi con i valori forniti
             for param_name, param_value in params.items():
-                param_values[param_name] = str(param_value) if param_value is not None else ""
+                # Controlla se è un parametro lista (nome contiene LIST o BARCODES)
+                if param_name and any(kw in param_name.upper() for kw in ['LIST', 'BARCODES', 'CODES', 'IDS']):
+                    param_values[param_name] = self._format_list_parameter(str(param_value) if param_value is not None else "")
+                else:
+                    param_values[param_name] = str(param_value) if param_value is not None else ""
             # Rimuovi le righe 'define'
             processed_sql = re.sub(r'define\s+\w+\s*=.*?(?=\n|$)', '', processed_sql, flags=re.IGNORECASE | re.MULTILINE)
             # Sostituisci TUTTI i parametri &PARAM con il valore o stringa vuota
@@ -667,6 +902,50 @@ class QueryService:
         except Exception as e:
             logger.error(f"Errore nella sostituzione dei parametri: {e}")
             return sql_content
+    
+    def _format_list_parameter(self, value: str) -> str:
+        """Formatta un parametro lista per SQL IN clause.
+        Supporta input nei formati: 
+        - 123,456,789 
+        - '123','456','789'
+        - 123\n456\n789
+        Restituisce: '123','456','789'
+        """
+        try:
+            if not value or not value.strip():
+                return "''"
+            
+            # Rimuovi spazi bianchi iniziali/finali
+            value = value.strip()
+            
+            # Step 1: Se già formattato con apici, rimuovili per normalizzare
+            # Pattern: rimuove apici singoli e doppi
+            value = re.sub(r"['\"]", '', value)
+            
+            # Step 2: Split per vari separatori (virgola, newline, spazi multipli)
+            # Supporta CR+LF, LF, virgola, spazi
+            items = re.split(r'[,\n\r\s]+', value)
+            
+            # Step 3: Filtra elementi vuoti e rimuovi spazi
+            items = [item.strip() for item in items if item.strip()]
+            
+            # Step 4: Valida lunghezza massima
+            if len(items) > 1000:
+                logger.warning(f"Lista parametri troppo lunga: {len(items)} elementi (max 1000)")
+                items = items[:1000]
+            
+            # Step 5: Formatta come 'val1','val2','val3'
+            # Escape apici interni raddoppiandoli (SQL standard)
+            formatted_items = [f"'{item.replace(chr(39), chr(39)+chr(39))}'" for item in items]
+            
+            result = ','.join(formatted_items)
+            logger.debug(f"Formatted list parameter: {len(items)} items")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Errore nella formattazione del parametro lista: {e}")
+            # Fallback sicuro
+            return "''"
     
     def _add_limit_clause(self, sql: str, limit: int, connection_name: str) -> str:
         """Aggiunge una clausola LIMIT/TOP ai DB che la supportano.

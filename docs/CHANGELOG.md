@@ -7,6 +7,101 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.2.0] - [2026-02-10] - Parametri lista con validazione e supporto multi-formato
+
+### Added
+- 📋 **Parametri lista per query**: gestione intelligente di parametri multipli (fino a 1000 elementi) con auto-detection pattern-based
+  - **Auto-detection**: riconoscimento automatico parametri contenenti `LIST`, `BARCODES`, `CODES`, `IDS` nel nome (case-insensitive)
+  - **Multi-formato input**: supporto formati diversi nello stesso campo textarea:
+    - Virgola: `123,456,789`
+    - Newline: `123\n456\n789` (incluso CR+LF Windows)
+    - Già formattato: `'123','456','789'`
+    - Doppi apici: `"123","456","789"`
+  - **Normalizzazione**: tutti i formati vengono trasformati in formato SQL standard `'val1','val2','val3'`
+  - **Validazione max 1000**: limite esplicito con contatore live (X/1000) e highlight errori
+  - **Troncamento automatico**: oltre 1000 elementi vengono troncati con warning nel log
+  - **Supporto valori alfanumerici**: barcode e codici possono contenere lettere e numeri
+  - **Supporto lunghezze variabili**: elementi con lunghezza diversa gestiti correttamente
+- 🎨 **UI textarea per liste**: interfaccia dedicata per parametri lista con validazione live
+  - **Textarea 5 righe** invece di input singola riga (font monospace per leggibilità)
+  - **Contatore live**: aggiornamento in tempo reale del numero elementi (X/1000)
+  - **Validazione colori**: bordo rosso + contatore rosso bold quando > 1000
+  - **Blocco esecuzione**: pre-validazione frontend impedisce submit con liste troppo lunghe
+  - **Placeholder descrittivo**: guida utente sui formati supportati
+
+### Changed
+- 🔍 **Query multi-statement migliorate**: supporto completo per query con preamble (es. `ALTER SESSION SET...`)
+  - Ogni statement separato da `;` viene eseguito in sequenza
+  - Commit automatico dopo DML/DDL per database Oracle
+  - L'ultimo `SELECT` restituisce il risultato all'utente
+  - Diagnostica dettagliata in caso di errore su statement specifico
+- 📝 **Query refactoring**: normalizzazione casing SQL in query informative (uppercase SELECT/FROM/WHERE/ORDER BY)
+- 🗑️ **Cleanup connections.json**: rimossa schedulazione test DSX obsoleta
+
+### Fixed
+- 🐛 **Parametro singolo vs lista**: `BARCODE` != `BARCODE_LIST` - solo parametri con naming pattern specifico vengono trasformati
+  - Query CDG-INF-004: usa `BARCODE_LIST` → funziona con input multipli
+  - Query CDG-INF-005: usa `BARCODE` → fallisce con input multipli (comportamento corretto)
+- ⚙️ **Robustezza scheduler**: aggiunti parametri configurabili per gestione misfire e coalesce
+  - `scheduler_coalesce_enabled`: accorpa esecuzioni perse (default: true)
+  - `scheduler_misfire_grace_time_sec`: finestra tolleranza per job in ritardo (default: 900s)
+  - Applicati a tutti job (cleanup, daily report, export schedulati)
+
+### Technical Details
+- Backend/Services: `app/services/query_service.py`
+  - Metodo `_format_list_parameter(value)`: normalizzazione input multipli con regex split `[,\n\r\s]+`
+  - Escape apici: rimozione nel preprocessing (pattern `re.sub(r"['\"]", '', value)`)
+  - Validazione 1000 elementi con troncamento automatico
+  - Pattern detection: `any(kw in param_name.upper() for kw in ['LIST', 'BARCODES', 'CODES', 'IDS'])`
+  - Multi-statement: split SQL per `;`, esecuzione sequenziale, gestione commit Oracle
+- Frontend/UI: `app/static/js/main.js`
+  - Funzione `renderParametersForm()`: detection automatica parametri lista via regex `/list|barcodes?|codes?|ids?/i`
+  - Render textarea 5 righe con classe `font-mono text-sm` per leggibilità
+  - Validazione live con event listener `input` e `blur`
+  - Conteggio elementi: split per `[,\n\r\s]+` dopo rimozione apici
+  - Highlight errori: `parameter-invalid` class per bordi rossi
+  - Pre-execution validation: blocco submit con messaggio errore esplicito
+- Frontend/Templates: `app/templates/index.html`
+  - Attributo `data-app-env="{{ app_environment }}"` per controlli ambiente
+- Backend/API: `app/api/scheduler.py`
+  - Helper `_to_int()` per conversione robusta parametri numerici
+  - Applicazione settings `misfire_grace_time` e `coalesce_enabled` a tutti job
+  - Daily report job ri-aggiunto durante reload_scheduler_jobs per evitare perdita dopo CRUD schedulazioni
+- Backend/API: `app/api/settings.py`
+  - Aggiunti `scheduler_coalesce_enabled` e `scheduler_misfire_grace_time_sec` in ALLOWED_KEYS
+- Backend/Config: `app/core/config.py`
+  - Nuovi campi Settings: `scheduler_coalesce_enabled: bool = True` e `scheduler_misfire_grace_time_sec: int = 900`
+- Frontend/Settings: `app/templates/settings.html`
+  - Sezione "Robustezza Scheduler" con input per coalesce e misfire
+- Query: modifiche multiple
+  - `Query/Affari Legali/CDG-AL-002--Estrati Tracciatura - tracciato AEG.sql`: `define BARCODE_LIST` con commento formati supportati, preamble `ALTER SESSION SET nls_date_format/nls_timestamp_format`
+  - `Query/Informative/CDG-INF-001`, `CDG-INF-002`, `CDG-INF-004`: normalizzazione uppercase keywords
+  - `Query/Informative/CDG-INF-005`: nuovo file test con `define BARCODE` (non trasformato)
+  - Rimossi file `.lnk` Windows
+  - Ripristinato `Query/Affari Legali/CDG-AL-001--Estrai spedizioni da Anagrafica.sql` (erroneamente eliminato)
+- Tests: `tests/test_list_parameters.py`
+  - 20 nuovi test per funzionalità parametri lista
+  - Test `_format_list_parameter()`: 15 test (comma, newline, CR+LF, mixed, alphanumeric, quotes, empty, max 1000, truncation, whitespace)
+  - Test `_substitute_parameters()`: 5 test (detection BARCODE_LIST/CODES/IDS, non-list params, case-insensitive)
+
+### Test
+- ✅ Suite completa: 225 passed, 0 failed (aggiunti 20 test nuovi)
+- ✅ Test parametri lista: copertura completa formati input e edge cases
+- ✅ Test regressioni: nessuna regressione su test esistenti (205 test)
+
+### File toccati (principali)
+- Backend/Services: `app/services/query_service.py` (metodo `_format_list_parameter`, multi-statement handling, substitution logic)
+- Backend/Services: `app/services/scheduler_service.py` (robustezza scheduler: misfire, coalesce, daily report reload fix)
+- Backend/API: `app/api/scheduler.py` (helper `_to_int`, applicazione settings scheduler a tutti job)
+- Backend/API: `app/api/settings.py` (nuove chiavi: `scheduler_coalesce_enabled`, `scheduler_misfire_grace_time_sec`)
+- Backend/Config: `app/core/config.py` (nuovi campi Settings robustezza scheduler)
+- Frontend/UI: `app/static/js/main.js` (textarea render, validazione live, pre-execution check)
+- Frontend/Templates: `app/templates/index.html` (data-app-env attribute), `app/templates/settings.html` (sezione robustezza)
+- Query: `Query/Affari Legali/CDG-AL-002` (BARCODE_LIST + ALTER SESSION), `Query/Informative/CDG-INF-001,002,004,005` (normalizzazione + restore CDG-AL-001)
+- Tests: `tests/test_list_parameters.py` (20 test nuovi), `connections.json` (cleanup schedulazione test)
+
+---
+
 ## [1.1.9] - [2026-02-06] - Fix restart servizio e conteggio fallimenti report
 
 ### Fixed

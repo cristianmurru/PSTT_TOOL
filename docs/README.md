@@ -167,6 +167,7 @@ Le query SQL devono essere salvate nella directory `Query/` con estensione `.sql
 I parametri possono essere definiti in due modi:
 
 1. **Define Oracle**:
+   ```sql
    define DATAFINE='17/06/2025'     --Opzionale
    ```
 
@@ -175,8 +176,50 @@ I parametri possono essere definiti in due modi:
    WHERE data >= TO_DATE('&DATAINIZIO', 'dd/mm/yyyy')
    ```
 
+#### Parametri Lista (v1.2.0+)
 
+Per parametri che accettano elenchi multipli di valori (fino a 1000 elementi), usa il naming pattern: `*_LIST`, `*CODES`, `*BARCODES`, `*IDS`.
+
+**Naming pattern riconosciuto (case-insensitive)**:
+- `BARCODE_LIST` ✅
+- `BARCODES` ✅
+- `CODES` ✅
+- `IDS` ✅
+- `barcode_list` ✅
+
+**Formati input supportati** (normalizzazione automatica):
+```
+# Virgola
+123,456,789
+
+# Newline (CR+LF o LF)
+123
+456
+789
+
+# Già formattato
+'123','456','789'
+
+# Doppi apici
+"123","456","789"
+```
+
+Tutti i formati vengono convertiti automaticamente in `'val1','val2','val3'` per Oracle.
+
+**Esempio query**:
 ```sql
+define BARCODE_LIST = '123,456,789'
+
+SELECT * 
+FROM mailpiece_tracks 
+WHERE barcode IN (&BARCODE_LIST)
+```
+
+**UI**: L'interfaccia mostra automaticamente una textarea (5 righe) con validazione live e contatore elementi (X/1000).
+
+---
+
+**Esempio parametro standard**:
 -- Estrazione accessi operatori
 -- Query per estrarre gli accessi degli operatori per ufficio
 
