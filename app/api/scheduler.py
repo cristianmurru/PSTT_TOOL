@@ -201,6 +201,14 @@ def reload_scheduler_jobs(request: Request):
     except Exception:
         pass
     scheduling = getattr(scheduler_service.settings, 'scheduling', [])
+    # Impostazioni robuste
+    def _to_int(val, default):
+        try:
+            return int(str(val))
+        except Exception:
+            return default
+    misfire = _to_int(getattr(scheduler_service.settings, 'scheduler_misfire_grace_time_sec', 900), 900)
+    coalesce_enabled = str(getattr(scheduler_service.settings, 'scheduler_coalesce_enabled', 'true')).lower() == 'true'
     for sched in scheduling:
         try:
             # Respect scheduling_mode: if 'cron' use cron_expression, otherwise build from hour/minute/days
@@ -234,20 +242,47 @@ def reload_scheduler_jobs(request: Request):
                 trigger,
                 args=[sched],
                 name=f"Export {sched.get('query')} on {sched.get('connection')}",
-                misfire_grace_time=600,
-                coalesce=True
+                misfire_grace_time=misfire,
+                coalesce=coalesce_enabled
             )
         except Exception:
             logger.exception(f"Impossibile aggiungere job per sched: {sched}")
     # Cleanup job
     try:
+        # Esegui direttamente la coroutine con AsyncIOScheduler invece di usare create_task
         scheduler_service.scheduler.add_job(
-            lambda: asyncio.create_task(scheduler_service.cleanup_old_exports()),
+            scheduler_service.cleanup_old_exports,
             CronTrigger(hour=7, minute=0),
-            name="Cleanup old exports"
+            name="Cleanup old exports",
+            misfire_grace_time=misfire,
+            coalesce=coalesce_enabled
         )
     except Exception:
-        pass
+        logger.exception("Impossibile aggiungere job cleanup_old_exports")
+
+    # Daily report job: deve essere ri-aggiunto anche durante reload, altrimenti si perde dopo update/delete schedulazioni
+    try:
+        if getattr(scheduler_service.settings, 'daily_report_enabled', False):
+            cron = getattr(scheduler_service.settings, 'daily_report_cron', None)
+            if cron:
+                try:
+                    dr_trigger = CronTrigger.from_crontab(cron)
+                except Exception:
+                    logger.warning(f"[DAILY_REPORT] Cron non valido '{cron}', fallback su daily_reports_hour")
+                    dr_trigger = CronTrigger(hour=getattr(scheduler_service.settings, 'daily_reports_hour', 6), minute=0)
+            else:
+                dr_trigger = CronTrigger(hour=getattr(scheduler_service.settings, 'daily_reports_hour', 6), minute=0)
+
+            # Usa funzione sincrona _daily_report_job del service
+            scheduler_service.scheduler.add_job(
+                scheduler_service._daily_report_job if hasattr(scheduler_service, '_daily_report_job') else (lambda: None),
+                dr_trigger,
+                name="Daily report schedulazioni",
+                misfire_grace_time=misfire,
+                coalesce=coalesce_enabled
+            )
+    except Exception:
+        logger.exception("[DAILY_REPORT] Errore durante ri-configurazione job giornaliero nel reload")
 
 
 @router.post("/scheduling", summary="Aggiungi una nuova schedulazione")

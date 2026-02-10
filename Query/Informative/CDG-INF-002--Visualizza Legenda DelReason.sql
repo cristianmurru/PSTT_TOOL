@@ -1,1 +1,3 @@
-select  * from starown.po_causali_delreason order by delreason
+SELECT  *
+FROM starown.po_causali_delreason
+ORDER BY delreason

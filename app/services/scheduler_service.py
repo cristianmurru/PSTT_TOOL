@@ -159,11 +159,19 @@ class SchedulerService:
                 except Exception as e:
                     logger.error(f"Errore nella creazione job per sched {sched}: {e}")
             # Cleanup job (direct coroutine, avoids create_task outside loop)
+            def _to_int(x, d):
+                try:
+                    return int(str(x))
+                except Exception:
+                    return d
+            misfire = _to_int(getattr(self.settings, 'scheduler_misfire_grace_time_sec', 900), 900)
+            coalesce_enabled = str(getattr(self.settings, 'scheduler_coalesce_enabled', 'true')).lower() == 'true'
             self.scheduler.add_job(
                 self.cleanup_old_exports,
                 CronTrigger(hour=7, minute=0),
                 name="Cleanup old exports",
-                misfire_grace_time=900,
+                misfire_grace_time=misfire,
+                coalesce=coalesce_enabled,
             )
             # Daily report job (configurabile via env)
             try:
@@ -182,8 +190,8 @@ class SchedulerService:
                         _daily_report_job,
                         dr_trigger,
                         name="Daily report schedulazioni",
-                        misfire_grace_time=900,
-                        coalesce=True
+                        misfire_grace_time=misfire,
+                        coalesce=coalesce_enabled
                     )
                     logger.info("[DAILY_REPORT] Job giornaliero configurato")
             except Exception:

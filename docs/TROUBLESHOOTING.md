@@ -458,6 +458,121 @@ TemplateError: Failed to render daily report
 
 ---
 
+### ❌ Errori Parametri Lista Query
+
+#### Problema: Parametro lista non viene trasformato
+
+**Errore**: Query con clausola `IN` fallisce con messaggio "invalid identifier" o "too many values"
+
+**Esempio query che fallisce**:
+```sql
+define BARCODE = '123,456,789'
+SELECT * FROM table WHERE barcode IN (&BARCODE)
+```
+
+**Cause**:
+- Il nome del parametro NON contiene le keywords richieste: `LIST`, `BARCODES`, `CODES`, `IDS`
+- Il sistema rileva automaticamente solo parametri con naming pattern specifico
+
+**Soluzioni**:
+
+1. **Rinomina parametro** con keyword riconosciuta:
+   ```sql
+   define BARCODE_LIST = '123,456,789'
+   SELECT * FROM table WHERE barcode IN (&BARCODE_LIST)
+   ```
+
+2. **Pattern riconosciuti (case-insensitive)**:
+   - `BARCODE_LIST` ✅
+   - `BARCODES` ✅
+   - `CODES` ✅
+   - `IDS` ✅
+   - `barcode_list` ✅ (minuscolo ok)
+   - `BARCODE` ❌ (non riconosciuto)
+   - `CODE` ❌ (non riconosciuto)
+
+#### Problema: Lista oltre 1000 elementi
+
+**Sintomi**:
+- Contatore UI mostra numero rosso (es. 1523/1000)
+- Bordo textarea diventa rosso
+- Blocco esecuzione query
+
+**Causa**: Limite tecnico 1000 elementi per prestazioni e sicurezza Oracle
+
+**Soluzioni**:
+
+1. **Ridurre lista** sotto 1000 elementi:
+   - Filtra elementi duplicati
+   - Suddividi query in batch multipli
+
+2. **Usare tabella temporanea** per liste molto grandi:
+   ```sql
+   -- Step 1: popola tabella temp
+   CREATE GLOBAL TEMPORARY TABLE temp_barcodes (barcode VARCHAR2(50))
+   ON COMMIT DELETE ROWS;
+   
+   INSERT INTO temp_barcodes VALUES ('123');
+   INSERT INTO temp_barcodes VALUES ('456');
+   -- ... fino a N elementi
+   
+   -- Step 2: JOIN con tabella temp
+   SELECT t.* 
+   FROM target_table t
+   JOIN temp_barcodes tb ON t.barcode = tb.barcode;
+   ```
+
+3. **Backend auto-truncation**: se submit forzato, backend tronca automaticamente a 1000 con warning nel log
+
+#### Problema: Formato input non riconosciuto
+
+**Esempi formati supportati** (tutti validi):
+```
+# Virgola
+123,456,789
+
+# Newline (CR+LF o LF)
+123
+456
+789
+
+# Già formattato
+'123','456','789'
+
+# Doppi apici
+"123","456","789"
+
+# Misto (virgola + newline + spazi)
+123, 456
+789 012
+```
+
+**Normalizzazione automatica**: tutti i formati vengono convertiti in `'123','456','789'` per SQL
+
+**Caratteri speciali**:
+- Apici singoli: rimossi automaticamente durante preprocessing
+- Doppi apici: rimossi automaticamente
+- Spazi extra: ignorati
+- Valori alfanumerici: supportati (es. `ABC123,XYZ789`)
+
+#### Problema: Parametro lista vuoto causa errore SQL
+
+**Sintomo**: Query fallisce con `WHERE barcode IN ()`
+
+**Causa**: Parametro lista valorizzato a stringa vuota o solo spazi
+
+**Soluzioni**:
+
+1. **Validazione frontend**: textarea richiesta mostra bordo rosso se vuota
+
+2. **Fallback backend**: parametro vuoto restituisce `''` invece di nulla
+
+3. **SQL robusto** con NVL/COALESCE:
+   ```sql
+   WHERE (&BARCODE_LIST IS NOT NULL AND barcode IN (&BARCODE_LIST))
+      OR &BARCODE_LIST IS NULL
+   ```
+
 ### ❌ Errori Query SQL
 
 #### Problema: Query con parametri Oracle non funzionano

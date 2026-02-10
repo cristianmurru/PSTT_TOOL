@@ -11,6 +11,8 @@ class PSITTool {
         this.filters = {};
         this.sorting = {};
         this.selectedSubdir = 'ALL';
+        this.editorFilename = null;
+        this.editorMode = 'view'; // 'view' | 'edit'
         
         this.initializeEventListeners();
         this.loadQueries();
@@ -56,6 +58,22 @@ class PSITTool {
             subdirSelector.addEventListener('change', (e) => {
                 this.selectedSubdir = e.target.value || 'ALL';
                 this.renderQueryList();
+            });
+        }
+
+        // SQL Editor buttons
+        const formatBtn = document.getElementById('formatSqlBtn');
+        const suggestBtn = document.getElementById('suggestSqlBtn');
+        const saveBtn = document.getElementById('saveSqlBtn');
+        const returnEditorBtn = document.getElementById('returnToSelectionEditorBtn');
+        if (formatBtn) formatBtn.addEventListener('click', () => this.formatSql());
+        if (suggestBtn) suggestBtn.addEventListener('click', () => this.suggestSql());
+        if (saveBtn) saveBtn.addEventListener('click', () => this.saveSql());
+        if (returnEditorBtn) {
+            returnEditorBtn.addEventListener('click', () => {
+                this.returnToSelection();
+                const section = document.getElementById('sqlEditorSection');
+                if (section) section.classList.add('hidden');
             });
         }
     }
@@ -111,6 +129,12 @@ class PSITTool {
                 if (tbody) tbody.innerHTML = '';
             }
 
+            // Hide SQL editor section and suggestions as well
+            const editorSection = document.getElementById('sqlEditorSection');
+            const suggestions = document.getElementById('sqlSuggestions');
+            if (editorSection) editorSection.classList.add('hidden');
+            if (suggestions) suggestions.classList.add('hidden');
+
             // Update status bar: keep query name if selected, but clear counts/time
             this.updateStatusBar();
 
@@ -119,6 +143,14 @@ class PSITTool {
             selection.setAttribute('tabindex', '-1');
             selection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             try { selection.focus({ preventScroll: true }); } catch (e) {}
+
+            // Reset editor mode label and hide suggest button to avoid stale state
+            try {
+                const modeLabel = document.getElementById('sqlEditorModeLabel');
+                const suggestBtn = document.getElementById('suggestSqlBtn');
+                if (modeLabel) modeLabel.textContent = '';
+                if (suggestBtn) suggestBtn.classList.add('hidden');
+            } catch (e) { /* ignore */ }
         } catch (e) {
             console.warn('Errore nel ritorno alla selezione:', e);
         }
@@ -191,6 +223,7 @@ class PSITTool {
         filteredQueries.forEach(query => {
             const queryItem = document.createElement('div');
             queryItem.className = 'query-item';
+            queryItem.setAttribute('data-filename', query.filename);
             // Evidenzia la query selezionata
             if (this.currentQuery && this.currentQuery.filename === query.filename) {
                 queryItem.classList.add('selected-query');
@@ -222,6 +255,11 @@ class PSITTool {
             `;
             queryList.appendChild(queryItem);
         });
+    }
+
+    resolveFilenameFromItem(item) {
+        if (!item) return null;
+        return item.getAttribute('data-filename');
     }
 
     populateSubdirSelector() {
@@ -292,6 +330,271 @@ class PSITTool {
             this.showError('Errore nella selezione della query: ' + error.message);
         }
     }
+
+    async openSqlViewer(filename) {
+        try {
+            const resp = await fetch(`/api/queries/${filename}`);
+            const info = await resp.json();
+            if (!resp.ok) throw new Error(info.detail || 'Errore caricamento contenuto');
+            const section = document.getElementById('sqlEditorSection');
+            const editor = document.getElementById('sqlEditor');
+            const saveBtn = document.getElementById('saveSqlBtn');
+            const suggestBtn = document.getElementById('suggestSqlBtn');
+            const modeLabel = document.getElementById('sqlEditorModeLabel');
+            const sugg = document.getElementById('sqlSuggestions');
+            if (!section || !editor) return;
+            this.editorFilename = filename;
+            this.editorMode = 'view';
+            editor.value = info.sql_content || '';
+            editor.setAttribute('readonly', 'readonly');
+            if (saveBtn) saveBtn.classList.add('loading');
+            if (suggestBtn) {
+                // Force-disable in view mode and hide to avoid CSS conflicts
+                try {
+                    suggestBtn.classList.add('hidden');
+                    suggestBtn.classList.add('opacity-50');
+                    suggestBtn.classList.add('pointer-events-none');
+                    suggestBtn.setAttribute('disabled', 'disabled');
+                    suggestBtn.style.display = 'none';
+                } catch (e) { /* ignore */ }
+            }
+            // Hide any previous editor notice
+            try {
+                const notice = document.getElementById('editorNotice');
+                if (notice) notice.classList.add('hidden');
+            } catch (e) { /* ignore */ }
+            if (modeLabel) modeLabel.textContent = '(Visualizzazione)';
+            section.classList.remove('hidden');
+            if (sugg) sugg.classList.add('hidden');
+            // Focus editor area below status bar
+            try {
+                section.setAttribute('tabindex', '0');
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                editor.setAttribute('tabindex', '0');
+                editor.focus({ preventScroll: true });
+            } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error('Visualizza SQL fallita:', e);
+            this.showError('Errore apertura Visualizza SQL: ' + e.message);
+        }
+    }
+
+    async openSqlEditor(filename) {
+        try {
+            const resp = await fetch(`/api/queries/${filename}`);
+            const info = await resp.json();
+            if (!resp.ok) throw new Error(info.detail || 'Errore caricamento contenuto');
+            const section = document.getElementById('sqlEditorSection');
+            const editor = document.getElementById('sqlEditor');
+            const saveBtn = document.getElementById('saveSqlBtn');
+            const suggestBtn = document.getElementById('suggestSqlBtn');
+            const modeLabel = document.getElementById('sqlEditorModeLabel');
+            const sugg = document.getElementById('sqlSuggestions');
+            if (!section || !editor) return;
+            // Block editing in production env (UI safeguard)
+            try {
+                const env = document.body.getAttribute('data-app-env') || '';
+                if (env && env.toLowerCase().includes('produzione')) {
+                    this.showError('Modifica disabilitata in ambiente di Produzione');
+                    return;
+                }
+            } catch (e) { /* ignore */ }
+            this.editorFilename = filename;
+            this.editorMode = 'edit';
+            editor.value = info.sql_content || '';
+            editor.removeAttribute('readonly');
+            if (saveBtn) saveBtn.classList.remove('loading');
+            if (suggestBtn) {
+                // Enable and show in edit mode
+                try {
+                    suggestBtn.classList.remove('hidden');
+                    suggestBtn.classList.remove('opacity-50');
+                    suggestBtn.classList.remove('pointer-events-none');
+                    suggestBtn.removeAttribute('disabled');
+                    suggestBtn.style.display = '';
+                } catch (e) { /* ignore */ }
+            }
+            // Hide any previous editor notice
+            try {
+                const notice = document.getElementById('editorNotice');
+                if (notice) notice.classList.add('hidden');
+            } catch (e) { /* ignore */ }
+            if (modeLabel) modeLabel.textContent = '(Modifica)';
+            section.classList.remove('hidden');
+            if (sugg) sugg.classList.add('hidden');
+            // Focus editor area below status bar
+            try {
+                section.setAttribute('tabindex', '0');
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                editor.setAttribute('tabindex', '0');
+                editor.focus({ preventScroll: true });
+            } catch (e) { /* ignore */ }
+        } catch (e) {
+            console.error('Modifica SQL fallita:', e);
+            this.showError('Errore apertura Modifica SQL: ' + e.message);
+        }
+    }
+
+    async formatSql() {
+        try {
+            const editor = document.getElementById('sqlEditor');
+            if (!editor || !this.editorFilename) return;
+            const sql = editor.value || '';
+            const resp = await fetch(`/api/queries/${this.editorFilename}/format`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql_content: sql })
+            });
+            if (resp.ok) {
+                const data = await resp.json();
+                editor.value = (data && data.formatted) ? data.formatted : sql;
+            } else {
+                // Fallback client-side formatter when endpoint not available
+                editor.value = this.basicFormatSql(sql);
+                this.showSuccess('Formattazione locale applicata');
+            }
+        } catch (e) {
+            console.error('Format SQL fallita:', e);
+            this.showError('Errore formattazione SQL: ' + e.message);
+        }
+    }
+
+    basicFormatSql(sql) {
+        try {
+            const keywords = [
+                'select', 'from', 'where', 'group by', 'order by', 'join', 'left join', 'right join',
+                'inner join', 'outer join', 'union', 'with', 'having', 'limit', 'offset', 'insert',
+                'update', 'delete'
+            ];
+            const upkw = (line) => {
+                const l = (line || '').trim();
+                const low = l.toLowerCase();
+                for (const kw of keywords) {
+                    if (low.startsWith(kw)) {
+                        return kw.toUpperCase() + l.slice(kw.length);
+                    }
+                }
+                return l;
+            };
+            let s = (sql || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            let lines = s.split('\n').map(upkw);
+            let joined = lines.join('\n');
+            [' FROM ', ' WHERE ', ' GROUP BY ', ' ORDER BY ', ' HAVING ', ' JOIN ', ' UNION '].forEach(kw => {
+                const re = new RegExp(kw, 'ig');
+                joined = joined.replace(re, '\n' + kw.trim() + ' ');
+            });
+            const outLines = [];
+            let indent = false;
+            joined.split('\n').forEach(ln => {
+                const low = (ln || '').trim().toLowerCase();
+                if (low.startsWith('select')) {
+                    indent = true;
+                    outLines.push(ln);
+                    return;
+                }
+                if (low.startsWith('from')) indent = false;
+                if (indent && ln.trim()) outLines.push('  ' + ln);
+                else outLines.push(ln);
+            });
+            // Strip trailing Oracle terminators
+            let out = outLines.join('\n').trimEnd();
+            while (out.endsWith(';') || out.endsWith('/')) {
+                out = out.slice(0, -1).trimEnd();
+            }
+            return out;
+        } catch (e) {
+            console.warn('basicFormatSql error:', e);
+            return sql;
+        }
+    }
+
+    async suggestSql() {
+        try {
+            const editor = document.getElementById('sqlEditor');
+            const sugg = document.getElementById('sqlSuggestions');
+            const list = document.getElementById('sqlSuggestionsList');
+            if (!editor || !this.editorFilename) return;
+            const sql = editor.value || '';
+            const resp = await fetch(`/api/queries/${this.editorFilename}/suggest`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql_content: sql, connection_name: this.currentConnection || '' })
+            });
+            let data;
+            try {
+                data = await resp.json();
+            } catch (e) {
+                throw new Error('Errore parsing risposta suggerimenti');
+            }
+            if (!resp.ok) throw new Error(data.detail || 'Errore suggerimenti');
+            const suggestions = data.suggestions || [];
+            const issues = data.issues || [];
+            if (list) {
+                list.innerHTML = '';
+                // Render issues first (errors/warnings)
+                issues.forEach(item => {
+                    const li = document.createElement('li');
+                    li.textContent = `${item.type === 'error' ? '[Errore]' : '[Avviso]'} ${item.message}`;
+                    li.style.color = item.type === 'error' ? '#b91c1c' : '#92400e';
+                    list.appendChild(li);
+                });
+                // Then suggestions
+                suggestions.forEach(s => {
+                    const li = document.createElement('li');
+                    li.textContent = s;
+                    list.appendChild(li);
+                });
+            }
+            if (sugg) sugg.classList.remove('hidden');
+        } catch (e) {
+            console.error('Suggerimenti SQL falliti:', e);
+            this.showError('Errore suggerimenti SQL: ' + e.message);
+        }
+    }
+
+    async saveSql() {
+        try {
+            if (this.editorMode !== 'edit' || !this.editorFilename) {
+                this.showError('Apri una query in modalità Modifica per salvare');
+                return;
+            }
+            const editor = document.getElementById('sqlEditor');
+            const saveBtn = document.getElementById('saveSqlBtn');
+            if (!editor) return;
+            const sql = editor.value || '';
+            // Disable save while processing
+            try { if (saveBtn) saveBtn.classList.add('loading'); } catch (e) {}
+            const resp = await fetch(`/api/queries/${this.editorFilename}/update`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sql_content: sql })
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || 'Errore salvataggio');
+            // Show inline notice with timestamp and filename
+            try {
+                const notice = document.getElementById('editorNotice');
+                const textEl = document.getElementById('editorNoticeText');
+                if (notice && textEl) {
+                    const now = new Date();
+                    const hh = String(now.getHours()).padStart(2, '0');
+                    const mm = String(now.getMinutes()).padStart(2, '0');
+                    const ss = String(now.getSeconds()).padStart(2, '0');
+                    textEl.textContent = `Query salvata (${this.editorFilename}) alle ${hh}:${mm}:${ss}`;
+                    notice.classList.remove('hidden');
+                    setTimeout(() => { try { notice.classList.add('hidden'); } catch (e) {} }, 6000);
+                }
+            } catch (e) { /* ignore */ }
+            // Optional global success
+            this.showSuccess('Query salvata con successo');
+        } catch (e) {
+            console.error('Salvataggio SQL fallito:', e);
+            this.showError('Errore salvataggio SQL: ' + e.message);
+        } finally {
+            const saveBtn = document.getElementById('saveSqlBtn');
+            try { if (saveBtn) saveBtn.classList.remove('loading'); } catch (e) {}
+        }
+    }
     
     renderParametersForm(query) {
         const parametersSection = document.getElementById('parametersSection');
@@ -310,28 +613,93 @@ class PSITTool {
                 const isRequired = param.required;
                 const inputClass = isRequired ? 'parameter-required' : 'parameter-optional';
                 
-                paramDiv.innerHTML = `
-                    <label class="block text-sm font-medium text-gray-700 mb-1">
-                        ${param.name}
-                        ${isRequired ? '<span class="text-red-500">*</span>' : '<span class="text-gray-400">(opzionale)</span>'}
-                    </label>
-                    <input 
-                        type="text" 
-                        id="param_${param.name}" 
-                        name="${param.name}"
-                        value="${param.default_value || ''}"
-                        placeholder="${this.getParameterPlaceholder(param)}"
-                        class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${inputClass}"
-                    />
-                    ${param.description ? `<p class="text-xs text-gray-500 mt-1">${param.description}</p>` : ''}
-                `;
+                // Detect se è un parametro lista (barcode, codes, ids, list)
+                const isListParam = param.name && /list|barcodes?|codes?|ids?/i.test(param.name);
+                
+                if (isListParam) {
+                    // Usa textarea per liste con contatore
+                    paramDiv.innerHTML = `
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            ${param.name}
+                            ${isRequired ? '<span class="text-red-500">*</span>' : '<span class="text-gray-400">(opzionale)</span>'}
+                        </label>
+                        <textarea 
+                            id="param_${param.name}" 
+                            name="${param.name}"
+                            rows="5"
+                            placeholder="Inserisci valori separati da virgola, newline o già formattati con apici (max 1000)"
+                            class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${inputClass} font-mono text-sm"
+                        >${param.default_value || ''}</textarea>
+                        <div class="flex justify-between items-center mt-1">
+                            <p class="text-xs text-gray-500">${param.description || 'Formati supportati: 123,456,789 oppure \'123\',\'456\',\'789\' oppure newline'}</p>
+                            <span id="counter_${param.name}" class="text-xs font-medium text-gray-600">0 / 1000</span>
+                        </div>
+                    `;
+                } else {
+                    // Input normale per altri parametri
+                    paramDiv.innerHTML = `
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            ${param.name}
+                            ${isRequired ? '<span class="text-red-500">*</span>' : '<span class="text-gray-400">(opzionale)</span>'}
+                        </label>
+                        <input 
+                            type="text" 
+                            id="param_${param.name}" 
+                            name="${param.name}"
+                            value="${param.default_value || ''}"
+                            placeholder="${this.getParameterPlaceholder(param)}"
+                            class="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${inputClass}"
+                        />
+                        ${param.description ? `<p class="text-xs text-gray-500 mt-1">${param.description}</p>` : ''}
+                    `;
+                }
                 
                 parametersForm.appendChild(paramDiv);
 
-                // Toggle invalid style on input/blur for required params
-                try {
-                    const inputEl = paramDiv.querySelector(`#param_${param.name}`);
-                    if (inputEl && isRequired) {
+                const inputEl = paramDiv.querySelector(`#param_${param.name}`);
+                if (!inputEl) return;
+                
+                if (isListParam) {
+                    // Validazione e contatore per liste
+                    const counterEl = paramDiv.querySelector(`#counter_${param.name}`);
+                    const validate = () => {
+                        const val = (inputEl.value || '').trim();
+                        if (!val) {
+                            if (counterEl) counterEl.textContent = '0 / 1000';
+                            if (isRequired) inputEl.classList.add('parameter-invalid');
+                            else inputEl.classList.remove('parameter-invalid');
+                            return;
+                        }
+                        
+                        // Conta elementi: split per virgola, newline, spazi
+                        const items = val.replace(/['"]/g, '').split(/[,\n\r\s]+/).filter(item => item.trim());
+                        const count = items.length;
+                        
+                        if (counterEl) {
+                            counterEl.textContent = `${count} / 1000`;
+                            if (count > 1000) {
+                                counterEl.classList.add('text-red-600', 'font-bold');
+                                counterEl.classList.remove('text-gray-600');
+                            } else {
+                                counterEl.classList.remove('text-red-600', 'font-bold');
+                                counterEl.classList.add('text-gray-600');
+                            }
+                        }
+                        
+                        if (count > 1000) {
+                            inputEl.classList.add('parameter-invalid');
+                        } else {
+                            inputEl.classList.remove('parameter-invalid');
+                        }
+                    };
+                    
+                    inputEl.addEventListener('input', validate);
+                    inputEl.addEventListener('blur', validate);
+                    validate(); // Initial state
+                    
+                } else {
+                    // Validazione standard per parametri non-lista
+                    if (isRequired) {
                         const validate = () => {
                             const hasVal = (inputEl.value || '').trim().length > 0;
                             if (hasVal) {
@@ -342,12 +710,11 @@ class PSITTool {
                         };
                         inputEl.addEventListener('input', validate);
                         inputEl.addEventListener('blur', validate);
-                        // Initial state: if default_value provided, ensure not invalid
                         if ((param.default_value || '').trim()) {
                             inputEl.classList.remove('parameter-invalid');
                         }
                     }
-                } catch (e) { /* ignore DOM errors */ }
+                }
             });
         }
         
@@ -381,20 +748,45 @@ class PSITTool {
         try {
             this.showLoading(true);
             
-            // Raccoglie parametri dal form
+            // Raccoglie parametri dal form (input + textarea)
             const parameters = {};
             const form = document.getElementById('parametersForm');
-            const inputs = form.querySelectorAll('input[name]');
+            const inputs = form.querySelectorAll('input[name], textarea[name]');
             
+            // Validazione prima dell'esecuzione
+            let hasValidationError = false;
             inputs.forEach(input => {
-                if (input.value.trim()) {
-                    parameters[input.name] = input.value.trim();
+                const name = input.name;
+                const val = (input.value || '').trim();
+                
+                // Check se è un parametro lista
+                const isListParam = name && /list|barcodes?|codes?|ids?/i.test(name);
+                
+                if (isListParam && val) {
+                    // Conta elementi per validare max 1000
+                    const items = val.replace(/['"]/g, '').split(/[,\n\r\s]+/).filter(item => item.trim());
+                    if (items.length > 1000) {
+                        input.classList.add('parameter-invalid');
+                        hasValidationError = true;
+                        this.showError(`Parametro ${name}: troppi elementi (${items.length}/1000)`);
+                        return;
+                    }
+                }
+                
+                // Aggiungi parametro se valorizzato
+                if (val) {
+                    parameters[name] = val;
                 }
             });
+            
+            if (hasValidationError) {
+                this.showLoading(false);
+                return;
+            }
 
             // Mark empty required fields as invalid before executing
             try {
-                const requiredInputs = form.querySelectorAll('input.parameter-required');
+                const requiredInputs = form.querySelectorAll('input.parameter-required, textarea.parameter-required');
                 requiredInputs.forEach(inp => {
                     const v = (inp.value || '').trim();
                     if (!v) {
@@ -419,11 +811,17 @@ class PSITTool {
                     limit: 1000
                 })
             });
-            
-            const result = await response.json();
-            
+            let result;
+            try {
+                result = await response.json();
+            } catch (parseErr) {
+                // Fallback: show status code/text for non-JSON responses
+                const msg = `HTTP ${response.status} - risposta non valida`;
+                throw new Error(msg);
+            }
             if (!response.ok || !result.success) {
-                throw new Error(result.error_message || result.detail || 'Errore nell\'esecuzione della query');
+                const detailMsg = result && (result.error_message || result.detail);
+                throw new Error(detailMsg || 'Errore nell\'esecuzione della query');
             }
             
             // Success: ensure required inputs are not shown as invalid anymore

@@ -23,6 +23,9 @@ ALLOWED_KEYS = [
     # Timeouts
     "scheduler_query_timeout_sec",
     "scheduler_write_timeout_sec",
+    # Scheduler robustness
+    "scheduler_coalesce_enabled",
+    "scheduler_misfire_grace_time_sec",
     # Scheduler retry
     "scheduler_retry_enabled",
     "scheduler_retry_delay_minutes",
