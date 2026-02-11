@@ -433,3 +433,78 @@ class TestRegressionRestartLoop:
         # VERIFICA: _exit_process NON deve essere chiamato nemmeno una volta
         assert len(exit_process_calls) == 0, \
             f"_exit_process called {len(exit_process_calls)} times in service mode - restart loop detected!"
+
+
+class TestRestartEnabledControl:
+    """Test per la feature enable_app_restart - controllo visibilità pulsante riavvio."""
+    
+    def test_restart_endpoint_disabled_returns_403(self, mock_service_exists):
+        """Verifica che /api/system/restart ritorni 403 quando enable_app_restart=false."""
+        from app.main import app
+        
+        client = TestClient(app)
+        
+        # Mock settings con enable_app_restart=false
+        with patch("app.core.config.get_settings") as mock_settings_func:
+            mock_config = Mock()
+            mock_config.enable_app_restart = False
+            mock_settings_func.return_value = mock_config
+            
+            response = client.post("/api/system/restart")
+        
+        # Verifica risposta 403 Forbidden
+        assert response.status_code == 403
+        data = response.json()
+        assert "disabilitato" in data["detail"].lower()
+    
+    def test_restart_endpoint_enabled_returns_200(self, mock_service_exists, mock_popen):
+        """Verifica che /api/system/restart funzioni normalmente quando enable_app_restart=true."""
+        from app.main import app
+        
+        client = TestClient(app)
+        
+        # Mock settings con enable_app_restart=true (default)
+        with patch("app.core.config.get_settings") as mock_settings_func:
+            mock_config = Mock()
+            mock_config.enable_app_restart = True
+            mock_settings_func.return_value = mock_config
+            
+            with patch("app.api.system._schedule_hot_restart"):
+                response = client.post("/api/system/restart")
+        
+        # Verifica risposta 200 OK
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+    
+    def test_restart_enabled_endpoint_returns_status(self):
+        """Verifica che /api/system/restart/enabled ritorni lo stato corretto."""
+        from app.main import app
+        
+        client = TestClient(app)
+        
+        # Test con enable_app_restart=true
+        with patch("app.core.config.get_settings") as mock_settings_func:
+            mock_config = Mock()
+            mock_config.enable_app_restart = True
+            mock_settings_func.return_value = mock_config
+            
+            response = client.get("/api/system/restart/enabled")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is True
+        assert "abilitato" in data["message"].lower()
+        
+        # Test con enable_app_restart=false
+        with patch("app.core.config.get_settings") as mock_settings_func:
+            mock_config = Mock()
+            mock_config.enable_app_restart = False
+            mock_settings_func.return_value = mock_config
+            
+            response = client.get("/api/system/restart/enabled")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["enabled"] is False
+        assert "disabilitato" in data["message"].lower()

@@ -210,21 +210,23 @@ class ConnectionService:
             # Costruisci connection string SQLAlchemy per oracledb - SENZA parametri extra
             connection_string = f"oracle+oracledb://{username}:{password}@{dsn}"
             
-            # Configurazione pool Oracle MINIMALE - senza connect_args problematici
+            # Configurazione pool Oracle OTTIMIZZATA - previene connessioni stale
             pool_config = {
                 "poolclass": QueuePool,
                 "pool_size": 3,
                 "max_overflow": 5,
-                "pool_pre_ping": False,  # Disabilito per evitare problemi
-                "pool_recycle": 3600
+                "pool_pre_ping": True,  # CRITICO: testa connessioni prima dell'uso
+                "pool_recycle": 1800,   # 30min invece di 1h per evitare stale connections
+                "pool_timeout": 30,      # Timeout attesa connessione dal pool
                 # NO connect_args per evitare conflitti con oracledb
             }
             
-            # Crea l'engine con configurazione minimale
+            # Crea l'engine con configurazione ottimizzata
             engine = create_engine(
                 connection_string,
                 **pool_config,
                 echo=False,
+                echo_pool="debug",  # Log operazioni pool per diagnostica
                 future=True
             )
             
@@ -260,15 +262,17 @@ class ConnectionService:
             "pool_size": 5,
             "max_overflow": 10,
             "pool_pre_ping": True,
-            "pool_recycle": 3600  # 1 ora
+            "pool_recycle": 1800,  # 30min invece di 1h
+            "pool_timeout": 30
         }
         
         if db_type.lower() == "oracle":
             base_config.update({
                 "pool_size": 3,
                 "max_overflow": 5,
-                "pool_pre_ping": True,
-                "pool_recycle": 3600,
+                "pool_pre_ping": True,  # CRITICO per Oracle
+                "pool_recycle": 1800,   # 30min
+                "pool_timeout": 30,
                 # oracledb moderno NON supporta encoding/nencoding
                 "connect_args": {}
             })
@@ -406,6 +410,27 @@ class ConnectionService:
             logger.info("Tutte le connessioni sono state chiuse")
         except Exception as e:
             logger.error(f"Errore nella chiusura delle connessioni: {e}")
+    
+    def get_pool_status(self, connection_name: str) -> Dict[str, Any]:
+        """Ottiene lo stato del connection pool per diagnostica"""
+        try:
+            if connection_name not in self._engines:
+                return {"error": "Connessione non trovata"}
+            
+            engine = self._engines[connection_name]
+            pool = engine.pool
+            
+            return {
+                "connection_name": connection_name,
+                "pool_size": pool.size(),
+                "checked_in": pool.checkedin(),
+                "checked_out": pool.checkedout(),
+                "overflow": pool.overflow(),
+                "status": "healthy" if pool.checkedin() > 0 else "warning"
+            }
+        except Exception as e:
+            logger.error(f"Errore nel recupero stato pool {connection_name}: {e}")
+            return {"error": str(e)}
     
     def __del__(self):
         """Destructor - chiude tutte le connessioni"""

@@ -7,6 +7,74 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.2.1] - [2026-02-11] - Fix connessioni stale Oracle e controllo riavvio produzione
+
+### Fixed
+- 🔒 **Oracle connection pool stale connections**: risolto problema timeout notturni schedulazioni
+  - **pool_pre_ping abilitato**: validazione connessioni prima dell'uso con `SELECT 1 FROM DUAL`
+  - **pool_recycle ridotto**: da 3600s (1h) a 1800s (30min) per prevenire timeout idle Oracle
+  - **Cleanup timeout esplicito**: chiusura connessioni stale dopo timeout query
+  - **Diagnostics**: aggiunto `get_pool_status()` per monitoraggio pool (size, checked_in, checked_out)
+  - File modificati: `app/services/connection_service.py`, `app/services/scheduler_service.py`
+- 🔧 **Versione dinamica da CHANGELOG**: `app_version` estratta automaticamente da CHANGELOG.md
+  - Elimina necessità di aggiornamento manuale versione in `config.py`
+  - Funzione `_extract_version_from_changelog()` in `app/core/config.py`
+  - Titolo browser sincronizzato con versione CHANGELOG
+
+### Added
+- 🎛️ **Controllo riavvio app configurabile**: nuova variabile `ENABLE_APP_RESTART` in `.env`
+  - Disabilita pulsante "Riavvia App" in produzione (`ENABLE_APP_RESTART=false`)
+  - Protezione API: endpoint `/restart` ritorna HTTP 403 se disabilitato
+  - Nuovo endpoint `/restart/enabled` per verificare stato
+  - UI dinamica: pulsante disabilitato con tooltip esplicativo
+  - File modificati: `.env.example`, `app/core/config.py`, `app/api/system.py`, `app/templates/settings.html`
+
+### Changed
+- ✅ **Test suite aggiornata**: aggiunti test per nuove feature
+  - Test `TestRestartEnabledControl` per controllo riavvio (3 test)
+  - Fix test `test_retry_scheduled_on_query_timeout` con inizializzazione scheduler
+  - 224 test passano (100% success rate)
+
+---
+
+## [1.2.0] - [2026-02-10] - Parametri lista con validazione e supporto multi-formato
+  - Funzione `_extract_version_from_changelog()` con fallback a "1.0.0"
+  - File modificati: `app/core/config.py`
+
+### Added
+- 🔐 **Controllo visibilità riavvio app**: variabile `ENABLE_APP_RESTART` per produzione
+  - **Backend protection**: endpoint `/api/system/restart` ritorna HTTP 403 se disabilitato
+  - **Frontend control**: pulsante riavvio disabilitato dinamicamente via API check
+  - **Status endpoint**: `/api/system/restart/enabled` per verificare configurazione
+  - **Configurazione**: `.env` con `ENABLE_APP_RESTART=false` disabilita riavvio in produzione
+  - File modificati: `app/core/config.py`, `app/api/system.py`, `app/templates/settings.html`
+- ✅ **Test coverage**: aggiunti test per feature `enable_app_restart`
+  - Test HTTP 403 quando disabilitato
+  - Test funzionamento normale quando abilitato
+  - Test endpoint `/restart/enabled` status
+  - File modificati: `tests/test_system_restart.py`
+
+### Technical Details
+- **Connection Pool Fix**:
+  - `pool_pre_ping: True` → SQLAlchemy esegue `SELECT 1 FROM DUAL` prima di usare connessione dal pool
+  - `pool_recycle: 1800` → ricicla connessioni ogni 30 min (prima timeout idle Oracle)
+  - Timeout cleanup in `scheduler_service.py` linea 311-313: chiusura esplicita dopo timeout
+  - Pool diagnostics: `get_pool_status(connection_name)` ritorna metriche pool
+- **Dynamic Version**:
+  - Funzione `_extract_version_from_changelog()` cerca pattern `## [X.Y.Z]` o `[X.Y.Z] - [YYYY-MM-DD]`
+  - `app_version: str = Field(default_factory=_extract_version_from_changelog)` in Settings
+  - Supporto fallback a "1.0.0" se CHANGELOG non trovato o parsing fallito
+- **Restart Control**:
+  - Settings: `enable_app_restart: bool = True` (default abilita per retrocompatibilità)
+  - API: controllo in `/api/system/restart` con `HTTPException(403)` se disabilitato
+  - Frontend: fetch `/api/system/restart/enabled` all'avvio, disabilita pulsante se `enabled: false`
+  - Tooltip esplicativo: "Riavvio disabilitato in configurazione (enable_app_restart=false)"
+
+### Breaking Changes
+Nessuno. Tutte le modifiche sono backward compatible con default che preservano comportamento esistente.
+
+---
+
 ## [1.2.0] - [2026-02-10] - Parametri lista con validazione e supporto multi-formato
 
 ### Added
