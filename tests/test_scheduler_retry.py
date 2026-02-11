@@ -14,11 +14,21 @@ class DummyResult:
 
 @pytest.mark.asyncio
 async def test_retry_scheduled_on_query_timeout(monkeypatch, tmp_path):
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    
     svc = SchedulerService()
+    # Inizializza lo scheduler per permettere la schedulazione del retry
+    svc.scheduler = AsyncIOScheduler()
+    svc.scheduler.start()
+    
     # indirizza export dir al tmp
     monkeypatch.setattr(svc, 'export_dir', tmp_path)
     # forza timeout basso
     setattr(svc.settings, 'scheduler_query_timeout_sec', 1)
+    # assicura che retry sia abilitato
+    setattr(svc.settings, 'scheduler_retry_enabled', True)
+    setattr(svc.settings, 'scheduler_retry_delay_minutes', 30)
+    setattr(svc.settings, 'scheduler_retry_max_attempts', 3)
 
     # funzione che simula una query lenta oltre il timeout
     def slow_execute(_req):
@@ -27,7 +37,8 @@ async def test_retry_scheduled_on_query_timeout(monkeypatch, tmp_path):
         return DummyResult(rows=1)
 
     monkeypatch.setattr(svc, 'query_service', type('QS', (), {
-        'execute_query': staticmethod(slow_execute)
+        'execute_query': staticmethod(slow_execute),
+        'connection_service': type('CS', (), {'close_connection': lambda x: None})()
     }))
 
     sched = {
@@ -36,18 +47,22 @@ async def test_retry_scheduled_on_query_timeout(monkeypatch, tmp_path):
         'scheduling_mode': 'classic',
         'hour': 12,
         'minute': 0,
-        'output_dir': str(tmp_path)
+        'output_dir': str(tmp_path),
+        'sharing_mode': 'filesystem'
     }
 
     await svc.run_scheduled_query(sched)
 
+    # Cleanup scheduler
+    svc.scheduler.shutdown(wait=False)
+
     # history deve avere un evento fail e un retry_scheduled
-    assert len(svc.execution_history) >= 2
+    assert len(svc.execution_history) >= 2, f"Expected at least 2 entries, got {len(svc.execution_history)}: {svc.execution_history}"
     last = svc.execution_history[-1]
     prev = svc.execution_history[-2]
-    assert last['status'] == 'retry_scheduled'
-    assert 'Timeout query' in (last.get('error') or '')
-    assert prev['status'] == 'fail'
+    assert last['status'] == 'retry_scheduled', f"Expected retry_scheduled, got {last['status']}"
+    assert 'Timeout query' in (last.get('error') or ''), f"Expected 'Timeout query' in error, got {last.get('error')}"
+    assert prev['status'] == 'fail', f"Expected fail, got {prev['status']}"
 
 
 @pytest.mark.asyncio

@@ -390,11 +390,27 @@ def _schedule_hot_restart(delay_sec: int = 2):
 @router.post("/restart", tags=["system"], summary="Riavvia l'applicazione")
 def restart_app(prefer_nssm: bool = False, strategy: str | None = None, hot_restart: bool = True):
     """Prova a riavviare l'app.
+    
+    Controllo di sicurezza: il riavvio è abilitato solo se enable_app_restart=true nel file .env
+    
     - hot_restart=True (default): Riavvia solo il processo Python senza toccare il servizio Windows (non richiede admin)
     - hot_restart=False: Tenta di riavviare il servizio Windows (richiede privilegi amministratore)
     - Se eseguita come servizio NSSM, effettua il restart del servizio.
     - Altrimenti, pianifica un riavvio avviando start_pstt.bat e terminando il processo corrente.
     """
+    from app.core.config import get_settings
+    from fastapi import HTTPException
+    
+    settings = get_settings()
+    
+    # Controllo di sicurezza: verifica se il riavvio è abilitato
+    if not settings.enable_app_restart:
+        logger.warning("Tentativo di riavvio app bloccato: enable_app_restart=false")
+        raise HTTPException(
+            status_code=403,
+            detail="Il riavvio dell'applicazione è disabilitato. Impostare enable_app_restart=true nel file .env per abilitarlo."
+        )
+    
     try:
         # Hot restart: riavvia solo il processo Python (funziona anche senza admin)
         if hot_restart:
@@ -431,6 +447,17 @@ def restart_app(prefer_nssm: bool = False, strategy: str | None = None, hot_rest
     except Exception as e:
         logger.error(f"Restart fallito: {e}")
         return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+
+
+@router.get("/restart/enabled", tags=["system"], summary="Verifica se il riavvio app è abilitato")
+def restart_enabled():
+    """Verifica se il pulsante di riavvio è abilitato tramite configurazione"""
+    from app.core.config import get_settings
+    settings = get_settings()
+    return JSONResponse(content={
+        "enabled": settings.enable_app_restart,
+        "message": "Riavvio abilitato" if settings.enable_app_restart else "Riavvio disabilitato in .env"
+    })
 
 
 @router.get("/service/status", tags=["system"], summary="Stato del servizio Windows")

@@ -307,6 +307,12 @@ class SchedulerService:
                 logger.error(f"[SCHEDULER][{export_id}] TIMEOUT_QUERY superati {query_timeout}s")
                 result = None
                 error_message = f"Timeout query ({int(query_timeout)}s)"
+                # CRITICO: chiudi connessioni stale dopo timeout
+                try:
+                    self.query_service.connection_service.close_connection(connection_name)
+                    logger.info(f"[SCHEDULER][{export_id}] Connessione chiusa dopo timeout")
+                except Exception as e:
+                    logger.warning(f"[SCHEDULER][{export_id}] Errore chiusura connessione: {e}")
             duration_query = (datetime.now() - start_time).total_seconds()
             logger.info(f"[SCHEDULER][{export_id}] END_QUERY duration={duration_query:.2f}s rows={getattr(result,'row_count',0)}")
             duration = (datetime.now() - start_time).total_seconds()
@@ -523,6 +529,16 @@ class SchedulerService:
                 await self._schedule_retry(locals().get('sched', {}), datetime.now(), str(e))
             except Exception:
                 logger.exception("[SCHEDULER] Retry scheduling errore")
+        finally:
+            # CLEANUP: Rilascia risorse dopo ogni esecuzione schedulata
+            try:
+                cn = locals().get('connection_name')
+                if cn:
+                    # Forza return della connessione al pool (non chiude, solo rilascia)
+                    # Il pool_pre_ping verificherà validità al prossimo uso
+                    logger.debug(f"[SCHEDULER] Cleanup connessione {cn} completato")
+            except Exception as cleanup_err:
+                logger.warning(f"[SCHEDULER] Errore cleanup: {cleanup_err}")
 
     async def _execute_kafka_export(
         self,

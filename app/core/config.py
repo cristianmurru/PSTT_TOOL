@@ -3,6 +3,7 @@ Configurazioni e settings per PSTT Tool
 """
 import os
 import json
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
@@ -10,6 +11,39 @@ from pydantic_settings import BaseSettings
 from pydantic import ConfigDict
 from loguru import logger
 from app.models.scheduling import SchedulingItem
+
+
+def _extract_version_from_changelog() -> str:
+    """
+    Estrae la versione più recente dal CHANGELOG.md.
+    Fallback a "1.0.0" se non trovato.
+    """
+    try:
+        # Preferisce docs/CHANGELOG.md, altrimenti CHANGELOG.md in root
+        base_dir = Path(__file__).parent.parent.parent
+        alt_path = base_dir / "docs" / "CHANGELOG.md"
+        root_path = base_dir / "CHANGELOG.md"
+        file_path = alt_path if alt_path.exists() else root_path
+        
+        if not file_path.exists():
+            return "1.0.0"
+        
+        md_text = file_path.read_text(encoding="utf-8")
+        
+        # Pattern 1: ## [1.2.0] - [2026-02-10]
+        mver = re.search(r"^##\s*\[(?P<ver>\d+\.\d+\.\d+)\]", md_text, flags=re.MULTILINE)
+        if mver:
+            return mver.group("ver")
+        
+        # Pattern 2: [1.2.0] - [2026-02-10] (senza ##)
+        mver2 = re.search(r"^\[(?P<ver>\d+\.\d+\.\d+)\]\s*-\s*\[\d{4}-\d{2}-\d{2}\]", md_text, flags=re.MULTILINE)
+        if mver2:
+            return mver2.group("ver")
+        
+        return "1.0.0"
+    except Exception as e:
+        logger.warning(f"Impossibile estrarre versione da CHANGELOG: {e}")
+        return "1.0.0"
 
 
 class DatabaseConfig(BaseModel):
@@ -115,7 +149,7 @@ class Settings(BaseSettings):
     
     # Informazioni applicazione
     app_name: str = "PSTT Tool"
-    app_version: str = "1.0.0"
+    app_version: str = Field(default_factory=_extract_version_from_changelog)
     debug: bool = False
     # Ambiente di esecuzione (SVILUPPO | COLLAUDO | PRODUZIONE)
     app_environment: str = "SVILUPPO"
@@ -202,6 +236,9 @@ class Settings(BaseSettings):
     
     # Security
     secret_key: str = "your-secret-key-change-in-production"
+    
+    # System Control
+    enable_app_restart: bool = True  # Abilita/disabilita pulsante riavvio app in produzione
     
     model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="allow")
 

@@ -201,9 +201,7 @@
                 </div>
                 <div class="actions">
                     <button class="btn" id="saveBtn">Salva</button>
-                    <button class="btn" id="restartBtn" style="margin-left:8px;"
-                        {% if app_environment and app_environment|lower == 'produzione' %}disabled title="Disabilitato in Produzione"{% endif %}
-                    >Riavvia App</button>
+                    <button class="btn" id="restartBtn" style="margin-left:8px;">Riavvia App</button>
                     <span class="msg" id="msg"></span>
                 </div>
                 <p style="margin-top:1rem;color:#6b7280;">Nota: le modifiche sono salvate subito, ma potrebbero essere attive solo dopo il riavvio dell'applicazione.</p>
@@ -231,6 +229,20 @@
             }
             const subj = document.getElementById('daily_report_subject');
             if (subj && (!subj.value || subj.value === 'None')) { subj.value = 'Report schedulazioni PSTT'; }
+            
+            // Controllo visibilità pulsante riavvio
+            try {
+                const restartRes = await fetch('/api/system/restart/enabled');
+                const restartData = await restartRes.json();
+                const restartBtn = document.getElementById('restartBtn');
+                if (restartBtn && !restartData.enabled) {
+                    restartBtn.disabled = true;
+                    restartBtn.title = 'Riavvio disabilitato in configurazione (enable_app_restart=false)';
+                    restartBtn.style.opacity = '0.5';
+                }
+            } catch (e) {
+                console.warn('Impossibile verificare stato riavvio:', e);
+            }
         }
         async function saveSettings() {
             const payload = {};
