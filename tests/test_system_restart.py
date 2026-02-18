@@ -376,8 +376,8 @@ class TestNSSMConfiguration:
     
     def test_install_service_script_uses_exit_not_restart(self):
         """
-        Verifica che install_service.ps1 configuri AppExit Default Exit.
-        Questo previene loop di restart su exit code 0.
+        Verifica che install_service.ps1 configuri AppExit Default Restart.
+        Questo permette il hot restart del servizio.
         """
         from pathlib import Path
         
@@ -386,13 +386,13 @@ class TestNSSMConfiguration:
         
         content = script_path.read_text(encoding="utf-8")
         
-        # Verifica che NON usi più "AppExit Default Restart"
-        assert "AppExit Default Restart" not in content, \
-            "install_service.ps1 should NOT use 'AppExit Default Restart' - causes restart loop!"
+        # Verifica che usi "AppExit Default Restart" per permettere hot restart
+        assert "AppExit Default Restart" in content, \
+            "install_service.ps1 should use 'AppExit Default Restart' to allow hot restart!"
         
-        # Verifica che usi "AppExit Default Exit"
-        assert "AppExit Default Exit" in content, \
-            "install_service.ps1 should use 'AppExit Default Exit' to prevent restart on exit 0"
+        # Verifica che ci sia anche la configurazione del delay
+        assert "AppRestartDelay" in content, \
+            "install_service.ps1 should configure AppRestartDelay for restart delay"
 
 
 # Test di regressione specifici per il bug fix

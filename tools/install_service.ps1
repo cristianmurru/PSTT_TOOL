@@ -86,11 +86,12 @@ nssm set $ServiceName Description "$Description"
 nssm set $ServiceName Start SERVICE_AUTO_START
 nssm set $ServiceName AppDirectory $projectRoot
 
-# Configura restart automatico solo per crash (exit code != 0)
-# Exit code 0 = terminazione normale, NON riavviare automaticamente
+# Configura restart automatico
+# Riavvia sempre il servizio quando il processo termina (exit code 0 incluso)
+# Necessario per hot restart funzionalità dell'app
 nssm set $ServiceName AppStopMethodSkip 0
 nssm set $ServiceName AppStopMethodConsole 1500
-nssm set $ServiceName AppExit Default Exit
+nssm set $ServiceName AppExit Default Restart
 nssm set $ServiceName AppRestartDelay 5000
 
 # Configura logging

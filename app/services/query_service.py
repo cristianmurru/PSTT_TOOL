@@ -556,7 +556,11 @@ class QueryService:
                         stmt = stmt.rstrip().rstrip(';').strip()
                         if not stmt:
                             continue
-                        is_select = stmt.lower().startswith("select") or stmt.lower().startswith("with")
+                        # Rimuovi commenti prima del check SELECT
+                        stmt_no_comments = re.sub(r'--[^\n]*', '', stmt)
+                        stmt_no_comments = re.sub(r'/\*.*?\*/', '', stmt_no_comments, flags=re.DOTALL)
+                        stmt_no_comments = stmt_no_comments.strip()
+                        is_select = stmt_no_comments.lower().startswith("select") or stmt_no_comments.lower().startswith("with")
                         try:
                             result = conn.execute(text(stmt))
                             # Per Oracle, commit dopo DML/DDL
@@ -703,7 +707,11 @@ class QueryService:
                             stmt = stmt.rstrip().rstrip(';').strip()
                             if not stmt:
                                 continue
-                            is_select = stmt.lower().startswith("select") or stmt.lower().startswith("with")
+                            # Rimuovi commenti prima del check SELECT
+                            stmt_no_comments = re.sub(r'--[^\n]*', '', stmt)
+                            stmt_no_comments = re.sub(r'/\*.*?\*/', '', stmt_no_comments, flags=re.DOTALL)
+                            stmt_no_comments = stmt_no_comments.strip()
+                            is_select = stmt_no_comments.lower().startswith("select") or stmt_no_comments.lower().startswith("with")
                             # Advanced diagnostics: measure execute and fetch times separately
                             exec_time_ms = None
                             fetch_time_ms = None

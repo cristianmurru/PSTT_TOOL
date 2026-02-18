@@ -145,6 +145,96 @@ Batch success rate below threshold: 85% < 95%
 
 ---
 
+### ❌ Errori Connessione Database Oracle
+
+#### Problema: Timeout query schedulazioni notturne (Stale Connections)
+
+**Sintomi**:
+- Tutte le schedulazioni notturne vanno in timeout (1200s)
+- Query funzionano correttamente se eseguite manualmente da SQL Developer
+- Dopo riavvio servizio, tutto riprende a funzionare normalmente
+- Logs mostrano pattern ripetuto di timeout consecutivi
+
+**Esempio log**:
+```
+2026-02-11 00:35:47 | ERROR | TIMEOUT_QUERY superati 1200.0s
+2026-02-11 02:00:51 | ERROR | TIMEOUT_QUERY superati 1200.0s
+2026-02-11 04:30:55 | ERROR | TIMEOUT_QUERY superati 1200.0s
+...
+2026-02-11 11:05:00 | INFO | START_QUERY timeout=1200.0s
+2026-02-11 11:05:08 | INFO | END_QUERY duration=8.23s rows=125  # Successo dopo restart
+```
+
+**Causa principale**: **Connection pool stale connections**
+- SQLAlchemy non valida connessioni prima dell'uso (`pool_pre_ping: False`)
+- Connessioni nel pool diventano "stale" dopo idle timeout Oracle
+- Oracle chiude connessioni idle > 30 minuti (dipende da configurazione DB)
+- Application continua a usare connessioni chiuse dal pool → timeout
+- Riavvio svuota pool → connessioni fresche → funziona temporaneamente
+
+**Soluzioni** (applicate in v1.2.1):
+
+1. **pool_pre_ping abilitato** (CRITICO):
+   ```python
+   # app/services/connection_service.py
+   "pool_pre_ping": True  # Esegue SELECT 1 FROM DUAL prima di usare connessione
+   ```
+
+2. **pool_recycle ridotto**:
+   ```python
+   "pool_recycle": 1800  # 30 min invece di 60 min
+   ```
+   - Ricicla connessioni prima del timeout idle Oracle
+   - Previene accumulo di connessioni stale
+
+3. **Cleanup esplicito dopo timeout**:
+   ```python
+   # app/services/scheduler_service.py
+   except asyncio.TimeoutError:
+       # Chiudi connessione stale dopo timeout
+       self.query_service.connection_service.close_connection(connection_name)
+   ```
+
+4. **Diagnostics pool** (monitoraggio):
+   ```python
+   # Verifica stato pool
+   status = connection_service.get_pool_status('ORACLE_PROD')
+   # Ritorna: pool_size, checked_in, checked_out, overflow
+   ```
+
+**Verifica fix applicato**:
+```powershell
+# 1. Controlla versione (deve essere >= 1.2.1)
+Invoke-RestMethod -Uri 'http://localhost:8000/api/monitoring/health'
+
+# 2. Verifica log pool_pre_ping
+Get-Content logs\app.log | Select-String "pool_pre_ping: True"
+
+# 3. Monitora schedulazioni overnight
+Get-Content logs\scheduler.log -Tail 100 | Select-String "TIMEOUT"
+# Non dovrebbero esserci timeout dopo il fix
+```
+
+**Workaround temporaneo** (se fix non applicato):
+```powershell
+# Riavvio programmato notturno (3:00 AM)
+$trigger = New-ScheduledTaskTrigger -Daily -At 3:00AM
+$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-Command Restart-Service PSTT_Tool"
+Register-ScheduledTask -TaskName "PSTT_Tool_Nightly_Restart" `
+    -Trigger $trigger -Action $action -User "SYSTEM"
+```
+
+**Prevenzione problemi simili**:
+- Sempre abilitare `pool_pre_ping: True` per database production
+- Impostare `pool_recycle` < timeout idle database
+- Monitorare pool metrics con `get_pool_status()`
+- Configurare alerting su timeout consecutivi (>3)
+
+#### Problema: ORA-12170 TNS:Connect timeout
+
+---
+
 ### ❌ Errori Scheduler Avanzato
 
 #### Problema: Timeout query o scrittura

@@ -7,6 +7,42 @@ e questo progetto aderisce al [Semantic Versioning](https://semver.org/spec/v2.0
 
 ---
 
+## [1.2.2] - 2026-02-18 - Fix parsing query multi-statement con commenti e nuove query PCL
+
+### Fixed
+- 🔧 **Query parsing multi-statement**: risolto problema rilevamento tipo statement con commenti inline
+  - **Rimozione commenti pre-check**: rimossi commenti `--` e `/* */` prima di verificare se statement è SELECT/WITH
+  - **Problema risolto**: query con commenti prima di SELECT venivano erroneamente trattate come DML
+  - **Pattern gestiti**: commenti inline (`-- comment`), block comments (`/* comment */`), multi-line
+  - **Impatto**: corretta esecuzione query report con header commentati
+  - File modificato: `app/services/query_service.py` (linee 559-562, 710-713)
+- ✅ **Test suite allineata**: corretto test configurazione NSSM per riflettere setup corretto servizio
+  - Test `test_install_service_script_uses_exit_not_restart` ora verifica correttamente `AppExit Default Restart`
+  - File modificato: `tests/test_system_restart.py`
+
+### Added
+- 📊 **Nuove query report PCL**: aggiunte query per monitoraggio mazzetti DSX giornalieri
+  - `CDG-PCL-001--Mazzetti DSX giornalieri - sintetico.sql`: report sintetico mazzetti DSX
+  - `CDG-PCL-002--Monitoraggio Mazzetti giornalieri - sintetico.sql`: monitoraggio operativo giornaliero
+  - Posizionate in `Query/Report/` per schedulazione automatica
+- 📋 **Analisi saturazione porte DB**: documento tecnico analisi incident Oracle
+  - `docs/ANALISI_SATURAZIONE_PORTE_DB_20260212.md`: analisi dettagliata configurazione connection pool
+  - Verifica che PSTT Tool NON è causa di saturazione porte (max 8 connessioni per DB)
+  - Documentazione protezioni: pool_pre_ping, pool_recycle, context manager, cleanup timeout
+
+### Changed
+- 🔄 **Schedulazioni produzione**: aggiornata configurazione schedulazioni in `connections.json`
+  - Attivate schedulazioni report DSX su produzione con frequenza giornaliera
+  - Modifiche per ottimizzazione orari esecuzione report
+
+### Documentation
+- 📝 **TROUBLESHOOTING.md**: aggiunta sezione errori connessione Oracle
+  - Dettaglio problema "Timeout query schedulazioni notturne (Stale Connections)"
+  - Soluzioni applicate in v1.2.1: pool_pre_ping, pool_recycle, cleanup esplicito
+  - Procedure verifica fix e workaround temporanei
+
+---
+
 ## [1.2.1] - [2026-02-11] - Fix connessioni stale Oracle e controllo riavvio produzione
 
 ### Fixed
